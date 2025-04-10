@@ -9,6 +9,7 @@ import {
   primaryKey,
   foreignKey,
   boolean,
+  unique,
 } from 'drizzle-orm/pg-core';
 
 export const user = pgTable('User', {
@@ -150,3 +151,35 @@ export const suggestion = pgTable(
 );
 
 export type Suggestion = InferSelectModel<typeof suggestion>;
+
+export const organization = pgTable('Organization', {
+  id: uuid('id').primaryKey().notNull().defaultRandom(),
+  name: varchar('name', { length: 255 }).notNull(),
+  createdAt: timestamp('createdAt').notNull().defaultNow(),
+  updatedAt: timestamp('updatedAt').notNull().defaultNow(),
+});
+
+export type Organization = InferSelectModel<typeof organization>;
+
+export const organizationMember = pgTable(
+  'OrganizationMember',
+  {
+    id: uuid('id').primaryKey().notNull().defaultRandom(),
+    organizationId: uuid('organizationId')
+      .notNull()
+      .references(() => organization.id),
+    userId: uuid('userId')
+      .notNull()
+      .references(() => user.id),
+    role: varchar('role', { enum: ['owner', 'admin', 'member'] })
+      .notNull()
+      .default('member'),
+    createdAt: timestamp('createdAt').notNull().defaultNow(),
+    updatedAt: timestamp('updatedAt').notNull().defaultNow(),
+  },
+  (table) => ({
+    uniqueUserOrg: unique('unique_user_org').on(table.organizationId, table.userId),
+  }),
+);
+
+export type OrganizationMember = InferSelectModel<typeof organizationMember>;

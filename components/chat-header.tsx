@@ -12,6 +12,7 @@ import { useSidebar } from './ui/sidebar';
 import { memo } from 'react';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 import { type VisibilityType, VisibilitySelector } from './visibility-selector';
+import { Grid } from 'lucide-react';
 
 function PureChatHeader({
   chatId,
@@ -66,6 +67,22 @@ function PureChatHeader({
           className="order-1 md:order-3"
         />
       )}
+
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="outline"
+            className="order-1 md:order-4 px-2 h-fit"
+            asChild
+          >
+            <Link href="/rag-resources">
+              <Grid className="h-4 w-4" />
+              <span className="sr-only md:not-sr-only ml-2">RAG Resources</span>
+            </Link>
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>RAG Resources</TooltipContent>
+      </Tooltip>
 
       <Button
         className="bg-zinc-900 dark:bg-zinc-100 hover:bg-zinc-800 dark:hover:bg-zinc-200 text-zinc-50 dark:text-zinc-900 hidden md:flex py-1.5 px-2 h-fit md:h-[34px] order-4 md:ml-auto"

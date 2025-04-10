@@ -20,8 +20,8 @@ alwaysApply: true
 5. **Display backend responses in the UI.**  
    Expose server or API responses (success/error) in a clear way, aiding both debugging and user feedback.
 
-6. **Use Supabase’s local dev server for development, and its PostgreSQL DB in production.**  
-   For local development, spin up a local Supabase instance. In production, connect to the Supabase-hosted PostgreSQL environment. Ensure consistent schema management across both environments.
+6. **Use Drizzle for DB operations, underlying, we have supabase’s local dev server for development, and its PostgreSQL DB in production.**  
+   For DB operations, use drizzle.
 
 7. **Use Pinecone for vector databases.**  
    For vector-based tasks, use Pinecone. Maintain references between your main data store (Supabase) and Pinecone for efficient search and retrieval.
