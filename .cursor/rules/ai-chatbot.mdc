@@ -1,0 +1,27 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# General Dev Codebase Rules
+
+1. **Use `pnpm` as the package manager.**  
+   Always run installation and dependency commands with `pnpm` (e.g., `pnpm install` etc.).
+
+2. **Next.js fullstack with App Router.**  
+   This codebase is built on Next.js, leveraging the App Router (`app/` directory) for routing and server components.
+
+3. **Use `shadcn` for UI components wherever possible.**  
+   Prefer Shadcn’s prebuilt or customized UI elements to maintain a consistent look and feel.
+
+4. **Loading states in UI.**  
+   Ensure that every server or data-fetch action includes a visible loading state so users know an operation is in progress.
+
+5. **Display backend responses in the UI.**  
+   Expose server or API responses (success/error) in a clear way, aiding both debugging and user feedback.
+
+6. **Use Supabase’s local dev server for development, and its PostgreSQL DB in production.**  
+   For local development, spin up a local Supabase instance. In production, connect to the Supabase-hosted PostgreSQL environment. Ensure consistent schema management across both environments.
+
+7. **Use Pinecone for vector databases.**  
+   For vector-based tasks, use Pinecone. Maintain references between your main data store (Supabase) and Pinecone for efficient search and retrieval.
