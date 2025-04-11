@@ -36,14 +36,37 @@ export const regularPrompt =
 
 export const systemPrompt = ({
   selectedChatModel,
+  context,
 }: {
   selectedChatModel: string;
+  context?: string;
 }) => {
-  if (selectedChatModel === 'chat-model-reasoning') {
-    return regularPrompt;
-  } else {
-    return `${regularPrompt}\n\n${artifactsPrompt}`;
+  if (context) {
+    return `${regularPrompt}\n\nWhen responding to the user's query, follow these guidelines:
+
+    1. Context Usage:
+       - When using information from the provided context, explicitly cite it by referencing the relevant parts
+       - Format citations as: [Context: "relevant quote or summary"]
+       - If the context is not relevant to the user's question, you can ignore it
+
+    2. General Knowledge:
+       - When using information not found in the context, clearly state: [Based on general knowledge], and follow this with a colon and then provide the information
+       - This helps distinguish between context-based and general knowledge responses
+
+    3. Response Structure:
+       - Start with the flags [Based on context] or [Based on general knowledge] in all caps
+       - Separate information per each flag type
+       - Use clear section breaks when discussing multiple topics
+       - Maintain a professional and helpful tone
+
+Context to consider:
+${context}`;
   }
+
+  // Only include artifacts prompt when there's no context
+  return selectedChatModel === 'chat-model-reasoning'
+    ? regularPrompt
+    : `${regularPrompt}\n\n${artifactsPrompt}`;
 };
 
 export const codePrompt = `

@@ -11,6 +11,7 @@ import {
   reasoningModel,
   titleModel,
 } from './models.test';
+import { embeddingModels } from './models';
 
 export const myProvider = isTestEnvironment
   ? customProvider({
@@ -19,6 +20,9 @@ export const myProvider = isTestEnvironment
         'chat-model-reasoning': reasoningModel,
         'title-model': titleModel,
         'artifact-model': artifactModel,
+      },
+      textEmbeddingModels: {
+        'text-embedding-3-small': openai.embedding('text-embedding-3-small'),
       },
     })
   : customProvider({
@@ -33,5 +37,9 @@ export const myProvider = isTestEnvironment
       },
       imageModels: {
         'small-model': openai.image('dall-e-3'),
+      },
+      textEmbeddingModels: {
+        'small-model': openai.embedding('text-embedding-3-small'),
+        'large-model': openai.embedding('text-embedding-3-large'),
       },
     });

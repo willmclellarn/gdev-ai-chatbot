@@ -57,6 +57,33 @@ export async function POST(request: Request) {
       return new Response('No user message found', { status: 400 });
     }
 
+    // Perform vector search for RAG
+    let context = '';
+    try {
+      const userMessageText = userMessage.parts
+        .filter((part): part is { type: 'text'; text: string } => part.type === 'text')
+        .map(part => part.text)
+        .join(' ');
+
+      const searchResponse = await fetch(`/api/rag/search`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          query: userMessageText,
+        }),
+      });
+
+      if (searchResponse.ok) {
+        const { context: searchContext } = await searchResponse.json();
+        context = searchContext;
+      }
+    } catch (error) {
+      console.error('🔵 [Chat API] Error performing vector search:', error);
+      // Continue without context if search fails
+    }
+
     const chat = await getChatById({ id });
 
     if (!chat) {
@@ -88,12 +115,23 @@ export async function POST(request: Request) {
       ],
     });
 
+    // log the context
+    console.log('🔵 [Chat API] Context:', context);
+
+    context = 'This is a test context';
+
+    // log the selectedChatModel
+    console.log('🔵 [Chat API] Selected chat model:', selectedChatModel);
+
+    // log the system prompt
+    console.log('🔵 [Chat API] System prompt:', systemPrompt({ selectedChatModel, context }));
+
     return createDataStreamResponse({
       execute: (dataStream) => {
         console.log(`🔵 [Chat API] Starting stream for chat ${id} with model: ${myProvider.languageModel(selectedChatModel).modelId}`);
         const result = streamText({
           model: myProvider.languageModel(selectedChatModel),
-          system: systemPrompt({ selectedChatModel }),
+          system: systemPrompt({ selectedChatModel, context }),
           messages,
           maxSteps: 5,
           experimental_activeTools:
