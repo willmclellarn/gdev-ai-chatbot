@@ -13,24 +13,24 @@ interface SuggestedActionsProps {
 function PureSuggestedActions({ chatId, append }: SuggestedActionsProps) {
   const suggestedActions = [
     {
-      title: 'What are the advantages',
-      label: 'of using Next.js?',
-      action: 'What are the advantages of using Next.js?',
+      title: 'How do I calculate',
+      label: 'debt-to-income ratio?',
+      action: 'How do I calculate debt-to-income ratio for mortgage qualification?',
     },
     {
-      title: 'Write code to',
-      label: `demonstrate djikstra's algorithm`,
-      action: `Write code to demonstrate djikstra's algorithm`,
+      title: 'What documents are needed',
+      label: 'for mortgage pre-approval?',
+      action: 'What documents are needed for mortgage pre-approval?',
     },
     {
-      title: 'Help me write an essay',
-      label: `about silicon valley`,
-      action: `Help me write an essay about silicon valley`,
+      title: 'Explain the difference between',
+      label: 'fixed and adjustable rate mortgages',
+      action: 'Explain the difference between fixed and adjustable rate mortgages',
     },
     {
-      title: 'What is the weather',
-      label: 'in San Francisco?',
-      action: 'What is the weather in San Francisco?',
+      title: 'What factors affect',
+      label: 'mortgage interest rates?',
+      action: 'What factors affect mortgage interest rates?',
     },
   ];
 
