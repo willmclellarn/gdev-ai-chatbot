@@ -1,6 +1,6 @@
 {
-  "id": "5398ccc2-9050-4227-93f0-b56e7f5d9bab",
-  "prevId": "ad0363dd-d818-4b71-a5cd-9d7d99813a7f",
+  "id": "8c41d187-78bf-4dce-a068-12fda05484d1",
+  "prevId": "12aea150-fe39-4947-b946-2a2ddff3ffdf",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -369,6 +369,101 @@
         }
       }
     },
+    "public.Prompt": {
+      "name": "Prompt",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "title": {
+          "name": "title",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "content": {
+          "name": "content",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "isPublic": {
+          "name": "isPublic",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "userId": {
+          "name": "userId",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "organizationId": {
+          "name": "organizationId",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updatedAt": {
+          "name": "updatedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "Prompt_userId_User_id_fk": {
+          "name": "Prompt_userId_User_id_fk",
+          "tableFrom": "Prompt",
+          "tableTo": "User",
+          "columnsFrom": [
+            "userId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "Prompt_organizationId_Organization_id_fk": {
+          "name": "Prompt_organizationId_Organization_id_fk",
+          "tableFrom": "Prompt",
+          "tableTo": "Organization",
+          "columnsFrom": [
+            "organizationId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {}
+    },
     "public.Suggestion": {
       "name": "Suggestion",
       "schema": "",
@@ -445,8 +540,8 @@
           "onDelete": "no action",
           "onUpdate": "no action"
         },
-        "Suggestion_documentId_documentCreatedAt_Document_id_createdAt_fk": {
-          "name": "Suggestion_documentId_documentCreatedAt_Document_id_createdAt_fk",
+        "suggestion_document_fk": {
+          "name": "suggestion_document_fk",
           "tableFrom": "Suggestion",
           "tableTo": "Document",
           "columnsFrom": [

@@ -3,8 +3,17 @@ import NextAuth, { type User, type Session } from 'next-auth';
 import Credentials from 'next-auth/providers/credentials';
 
 import { getUser } from '@/lib/db/queries';
+import { organizationMember } from '@/lib/db/schema';
+import { eq } from 'drizzle-orm';
+import { db } from '@/lib/db';
 
 import { authConfig } from './auth.config';
+
+declare module 'next-auth' {
+  interface User {
+    orgIds?: string[];
+  }
+}
 
 interface ExtendedSession extends Session {
   user: User;
@@ -47,6 +56,14 @@ export const {
     }) {
       if (session.user) {
         session.user.id = token.id as string;
+
+        // Fetch organization IDs for the user
+        const members = await db
+          .select()
+          .from(organizationMember)
+          .where(eq(organizationMember.userId, token.id));
+
+        session.user.orgIds = members.map(member => member.organizationId);
       }
 
       return session;

@@ -25,3 +25,6 @@ alwaysApply: true
 
 7. **Use Pinecone for vector databases.**  
    For vector-based tasks, use Pinecone. Maintain references between your main data store (Supabase) and Pinecone for efficient search and retrieval.
+
+8. **Logging guidelines**
+   Use my backend emoji 🔵 for backend logs, and 🟡 for frontend logs

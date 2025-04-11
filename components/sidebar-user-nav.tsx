@@ -48,7 +48,7 @@ export function SidebarUserNav({ user }: { user: User }) {
               className="cursor-pointer"
               onClick={() => router.push('/settings')}
             >
-              App Settings
+              Settings
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem

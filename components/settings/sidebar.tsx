@@ -46,6 +46,11 @@ const sidebarNavItems = [
     href: '/settings/email',
     icon: Mail,
   },
+  {
+    title: 'Prompts',
+    href: '/settings/prompts',
+    icon: MessageSquare,
+  },
 ];
 
 export function Sidebar() {

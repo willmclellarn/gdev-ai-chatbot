@@ -66,7 +66,8 @@ CREATE TABLE IF NOT EXISTS "Suggestion" (
 CREATE TABLE IF NOT EXISTS "User" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"email" varchar(64) NOT NULL,
-	"password" varchar(64)
+	"password" varchar(64),
+	"isAdmin" boolean DEFAULT false NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE IF NOT EXISTS "Vote_v2" (
@@ -126,7 +127,7 @@ EXCEPTION
 END $$;
 --> statement-breakpoint
 DO $$ BEGIN
- ALTER TABLE "Suggestion" ADD CONSTRAINT "Suggestion_documentId_documentCreatedAt_Document_id_createdAt_fk" FOREIGN KEY ("documentId","documentCreatedAt") REFERENCES "public"."Document"("id","createdAt") ON DELETE no action ON UPDATE no action;
+ ALTER TABLE "Suggestion" ADD CONSTRAINT "suggestion_document_fk" FOREIGN KEY ("documentId","documentCreatedAt") REFERENCES "public"."Document"("id","createdAt") ON DELETE no action ON UPDATE no action;
 EXCEPTION
  WHEN duplicate_object THEN null;
 END $$;

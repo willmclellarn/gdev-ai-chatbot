@@ -1,1 +1,0 @@
-ALTER TABLE "User" ADD COLUMN "isWill" boolean DEFAULT false NOT NULL;

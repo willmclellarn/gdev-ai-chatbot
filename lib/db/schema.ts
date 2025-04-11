@@ -147,6 +147,7 @@ export const suggestion = pgTable(
     documentRef: foreignKey({
       columns: [table.documentId, table.documentCreatedAt],
       foreignColumns: [document.id, document.createdAt],
+      name: 'suggestion_document_fk'
     }),
   }),
 );
@@ -184,3 +185,21 @@ export const organizationMember = pgTable(
 );
 
 export type OrganizationMember = InferSelectModel<typeof organizationMember>;
+
+export const prompt = pgTable('Prompt', {
+  id: uuid('id').primaryKey().notNull().defaultRandom(),
+  title: varchar('title', { length: 255 }).notNull(),
+  content: text('content').notNull(),
+  description: text('description'),
+  isPublic: boolean('isPublic').notNull().default(false),
+  userId: uuid('userId')
+    .notNull()
+    .references(() => user.id),
+  organizationId: uuid('organizationId')
+    .references(() => organization.id),
+  createdAt: timestamp('createdAt').notNull().defaultNow(),
+  updatedAt: timestamp('updatedAt').notNull().defaultNow(),
+});
+
+export type Prompt = InferSelectModel<typeof prompt>;
+

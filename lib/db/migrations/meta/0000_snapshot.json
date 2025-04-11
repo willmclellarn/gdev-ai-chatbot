@@ -1,5 +1,5 @@
 {
-  "id": "ad0363dd-d818-4b71-a5cd-9d7d99813a7f",
+  "id": "12aea150-fe39-4947-b946-2a2ddff3ffdf",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -445,8 +445,8 @@
           "onDelete": "no action",
           "onUpdate": "no action"
         },
-        "Suggestion_documentId_documentCreatedAt_Document_id_createdAt_fk": {
-          "name": "Suggestion_documentId_documentCreatedAt_Document_id_createdAt_fk",
+        "suggestion_document_fk": {
+          "name": "suggestion_document_fk",
           "tableFrom": "Suggestion",
           "tableTo": "Document",
           "columnsFrom": [
@@ -493,6 +493,13 @@
           "type": "varchar(64)",
           "primaryKey": false,
           "notNull": false
+        },
+        "isAdmin": {
+          "name": "isAdmin",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
         }
       },
       "indexes": {},
