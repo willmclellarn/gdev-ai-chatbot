@@ -28,3 +28,9 @@ alwaysApply: true
 
 8. **Logging guidelines**
    Use my backend emoji 🔵 for backend logs, and 🟡 for frontend logs
+
+9. **Email guidelines**
+   Use Resend for email api needs
+
+10. **DB Migrations**
+   Use the pnpm run db:push in order to generate and run migrations after editing the Drizzle schema

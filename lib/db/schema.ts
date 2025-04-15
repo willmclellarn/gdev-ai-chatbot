@@ -19,6 +19,13 @@ export const user = pgTable('User', {
   isAdmin: boolean('isAdmin').notNull().default(false),
 });
 
+export const passwordResetToken = pgTable('PasswordResetToken', {
+  id: uuid('id').primaryKey().notNull().defaultRandom(),
+  token: varchar('token', { length: 64 }).notNull(),
+  userId: uuid('userId').notNull().references(() => user.id),
+  expiresAt: timestamp('expiresAt').notNull(),
+});
+
 export type User = InferSelectModel<typeof user>;
 
 export const chat = pgTable('Chat', {
