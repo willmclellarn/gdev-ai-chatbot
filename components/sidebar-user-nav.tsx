@@ -4,6 +4,8 @@ import Image from 'next/image';
 import type { User } from 'next-auth';
 import { signOut } from 'next-auth/react';
 import { useTheme } from 'next-themes';
+import { useUserOrg } from '@/app/hooks/useAuth';
+import { useOrganizationName } from '@/app/hooks/useOrganizationName';
 
 import {
   DropdownMenu,
@@ -22,6 +24,8 @@ import { useRouter } from 'next/navigation';
 export function SidebarUserNav({ user }: { user: User }) {
   const { setTheme, theme } = useTheme();
   const router = useRouter();
+  const orgIds = useUserOrg();
+  const { orgName, isLoading } = useOrganizationName(orgIds[0] || null);
 
   return (
     <SidebarMenu>
@@ -36,7 +40,14 @@ export function SidebarUserNav({ user }: { user: User }) {
                 height={24}
                 className="rounded-full"
               />
-              <span className="truncate">{user?.email}</span>
+              <div className="flex flex-col items-start">
+                <span className="truncate">{user?.email}</span>
+                {orgName && (
+                  <span className="text-xs text-muted-foreground truncate">
+                    {orgName}
+                  </span>
+                )}
+              </div>
               <ChevronUp className="ml-auto" />
             </SidebarMenuButton>
           </DropdownMenuTrigger>

@@ -11,18 +11,15 @@ import { PlusIcon, VercelIcon } from './icons';
 import { useSidebar } from './ui/sidebar';
 import { memo } from 'react';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
-import { type VisibilityType, VisibilitySelector } from './visibility-selector';
 import { Grid } from 'lucide-react';
 
 function PureChatHeader({
   chatId,
   selectedModelId,
-  selectedVisibilityType,
   isReadonly,
 }: {
   chatId: string;
   selectedModelId: string;
-  selectedVisibilityType: VisibilityType;
   isReadonly: boolean;
 }) {
   const router = useRouter();
@@ -60,19 +57,11 @@ function PureChatHeader({
         />
       )}
 
-      {!isReadonly && (
-        <VisibilitySelector
-          chatId={chatId}
-          selectedVisibilityType={selectedVisibilityType}
-          className="order-1 md:order-3"
-        />
-      )}
-
       <Tooltip>
         <TooltipTrigger asChild>
           <Button
             variant="outline"
-            className="order-1 md:order-4 px-2 h-fit"
+            className="order-1 md:order-3 px-2 h-fit"
             asChild
           >
             <Link href="/rag-resources">
