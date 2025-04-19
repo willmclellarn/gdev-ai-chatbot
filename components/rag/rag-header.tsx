@@ -7,10 +7,10 @@ import { useState } from 'react';
 
 import { SidebarToggle } from '@/components/sidebar-toggle';
 import { Button } from '@/components/ui/button';
-import { PlusIcon } from './icons';
-import { useSidebar } from './ui/sidebar';
+import { PlusIcon } from '../icons';
+import { useSidebar } from '../ui/sidebar';
 import { memo } from 'react';
-import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
+import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -25,7 +25,7 @@ import {
   UserIcon,
   UsersIcon,
   GlobeIcon,
-} from './icons';
+} from '../icons';
 import { useAdmin } from '@/hooks/use-admin';
 
 function PureRAGHeader() {

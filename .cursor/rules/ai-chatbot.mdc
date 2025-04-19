@@ -34,3 +34,13 @@ alwaysApply: true
 
 10. **DB Migrations**
    Use the pnpm run db:push in order to generate and run migrations after editing the Drizzle schema
+
+11. **Page Size and Component Organization**
+    - Keep page components under 200 lines of code
+    - Break down complex pages into smaller, focused components
+    - Each component should have a single responsibility
+    - Place components in a dedicated directory under the page they belong to
+    - Use clear, descriptive names for component files (e.g., `file-selection.tsx`, `chunking-config.tsx`)
+    - Keep component props minimal and focused
+    - Use TypeScript interfaces for component props
+    - Document complex component logic with comments 

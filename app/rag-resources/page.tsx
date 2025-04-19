@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Card,
   CardContent,
@@ -8,96 +8,90 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Button } from '@/components/ui/button';
-import { Slider } from '@/components/ui/slider';
-import { toast } from 'sonner';
-import { RAGHeader } from '@/components/rag-header';
-import { useAdmin } from '@/hooks/use-admin';
-import { AlertCircle, Bell, Eye } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import {
-  RadioGroup,
-  RadioGroupItem,
-} from "@/components/ui/radio-group";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import { ChunkingStrategy, splitTextIntoChunks } from '@/lib/utils/chunking';
+import { AlertCircle, Bell } from 'lucide-react';
+import { RAGHeader } from '@/components/rag/rag-header';
+import { useAdmin } from '@/hooks/use-admin';
+import { RagFileSelection } from '@/components/rag/rag-file-selection';
+import { RagChunkingConfig } from '@/components/rag/rag-chunking-config';
+import { RagPreview } from '@/components/rag/rag-preview';
+import { RagUpload } from '@/components/rag/rag-upload';
+import { ChunkingStrategy } from '@/lib/utils/chunking';
+
+interface AssetFile {
+  name: string;
+  path: string;
+}
 
 export default function RAGResourcesPage() {
   const [file, setFile] = useState<File | null>(null);
+  const [selectedLocalFile, setSelectedLocalFile] = useState<string>('');
+  const [localFiles, setLocalFiles] = useState<AssetFile[]>([]);
+  const [isLoadingFiles, setIsLoadingFiles] = useState(true);
   const [chunkSize, setChunkSize] = useState(1000);
   const [chunkOverlap, setChunkOverlap] = useState(200);
   const [isUploading, setIsUploading] = useState(false);
-  const [chunkingStrategy, setChunkingStrategy] = useState<ChunkingStrategy>('token');
+  const [chunkingStrategy, setChunkingStrategy] = useState<ChunkingStrategy>('auto');
   const [previewText, setPreviewText] = useState('');
+  const [previewFormat, setPreviewFormat] = useState<'plain' | 'html' | 'markdown'>('plain');
   const [previewChunks, setPreviewChunks] = useState<string[]>([]);
+  const [keywords, setKeywords] = useState<string>('');
   const { isAdmin, isLoading } = useAdmin();
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = e.target.files?.[0];
-    if (selectedFile) {
-      setFile(selectedFile);
-    }
-  };
+  useEffect(() => {
+    const fetchLocalFiles = async () => {
+      try {
+        const response = await fetch('/api/rag/list-assets');
+        if (!response.ok) throw new Error('Failed to fetch files');
+        const files = await response.json();
+        setLocalFiles(files);
+      } catch (error) {
+        console.error('Error fetching local files:', error);
+      } finally {
+        setIsLoadingFiles(false);
+      }
+    };
 
-  const handlePreview = () => {
-    if (!previewText) {
-      toast.error('Please enter some text to preview');
-      return;
-    }
+    fetchLocalFiles();
+  }, []);
 
+  const handleLocalFileSelect = async (path: string) => {
     try {
-      const chunks = splitTextIntoChunks(previewText, {
-        strategy: chunkingStrategy,
-        chunkSize,
-        chunkOverlap,
+      const response = await fetch(path);
+      if (!response.ok) throw new Error('Failed to fetch file');
+
+      const blob = await response.blob();
+      const file = new File([blob], path.split('/').pop() || 'document', {
+        type: blob.type
       });
-      setPreviewChunks(chunks.slice(0, 5)); // Show first 5 chunks
-    } catch (error) {
-      toast.error('Failed to generate preview');
-      console.error(error);
-    }
-  };
 
-  const handleUpload = async () => {
-    if (!file) {
-      toast.error('Please select a file first');
-      return;
-    }
-
-    setIsUploading(true);
-    try {
       const formData = new FormData();
       formData.append('file', file);
-      formData.append('chunkSize', chunkSize.toString());
-      formData.append('chunkOverlap', chunkOverlap.toString());
-      formData.append('chunkingStrategy', chunkingStrategy);
 
-      const response = await fetch('/api/rag/upload', {
+      const processedDoc = await fetch("/api/rag/process-doc", {
         method: 'POST',
         body: formData,
-      });
+      }).then(res => res.json());
 
-      if (!response.ok) {
-        throw new Error('Upload failed');
-      }
-
-      toast.success('File uploaded and processed successfully');
-      setFile(null);
+      setFile(file);
+      setSelectedLocalFile(path);
+      setPreviewText(processedDoc.text);
+      setPreviewFormat(processedDoc.format);
     } catch (error) {
-      toast.error('Failed to upload and process file');
-      console.error(error);
-    } finally {
-      setIsUploading(false);
+      console.error('🟡 Error processing file:', error);
     }
+  };
+
+  const handleFileSelect = (selectedFile: File, text: string, format: 'plain' | 'html' | 'markdown') => {
+    setFile(selectedFile);
+    setSelectedLocalFile('');
+    setPreviewText(text);
+    setPreviewFormat(format);
+  };
+
+  const handleUploadComplete = () => {
+    setFile(null);
+    setIsUploading(false);
   };
 
   if (isLoading) {
@@ -153,124 +147,49 @@ export default function RAGResourcesPage() {
 
             {isAdmin && (
               <>
-                <div className="space-y-2">
-                  <Label htmlFor="file">PDF File</Label>
-                  <Input
-                    id="file"
-                    type="file"
-                    accept=".pdf"
-                    onChange={handleFileChange}
-                    disabled={isUploading}
-                  />
-                </div>
+                <RagFileSelection
+                  onFileSelect={handleFileSelect}
+                  onLocalFileSelect={handleLocalFileSelect}
+                  isLoadingFiles={isLoadingFiles}
+                  localFiles={localFiles}
+                  selectedLocalFile={selectedLocalFile}
+                  isUploading={isUploading}
+                />
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label>Chunking Strategy</Label>
-                      <Select
-                        value={chunkingStrategy}
-                        onValueChange={(value: ChunkingStrategy) => setChunkingStrategy(value)}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select chunking strategy" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="token">Token-based</SelectItem>
-                          <SelectItem value="headers">Header-based</SelectItem>
-                          <SelectItem value="centered">Centered Content</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <p className="text-sm text-muted-foreground">
-                        {chunkingStrategy === 'token' && 'Split text into chunks based on token count'}
-                        {chunkingStrategy === 'headers' && 'Split text into chunks based on markdown headers'}
-                        {chunkingStrategy === 'centered' && 'Split text into chunks based on centered content'}
-                      </p>
-                    </div>
-                  </div>
+                <RagChunkingConfig
+                  chunkingStrategy={chunkingStrategy}
+                  onStrategyChange={setChunkingStrategy}
+                  chunkSize={chunkSize}
+                  onChunkSizeChange={setChunkSize}
+                  chunkOverlap={chunkOverlap}
+                  onChunkOverlapChange={setChunkOverlap}
+                  keywords={keywords}
+                  onKeywordsChange={setKeywords}
+                />
 
-                  <div className="space-y-4">
-                    {chunkingStrategy === 'token' && (
-                      <>
-                        <div className="space-y-2">
-                          <Label>Chunk Size (tokens)</Label>
-                          <Slider
-                            value={[chunkSize]}
-                            onValueChange={([value]: number[]) => setChunkSize(value)}
-                            min={100}
-                            max={2000}
-                            step={100}
-                          />
-                          <p className="text-sm text-muted-foreground">
-                            {chunkSize} tokens per chunk
-                          </p>
-                        </div>
+                <RagPreview
+                  previewText={previewText}
+                  onPreviewTextChange={setPreviewText}
+                  previewFormat={previewFormat}
+                  onPreviewFormatChange={setPreviewFormat}
+                  previewChunks={previewChunks}
+                  onPreviewChunksChange={setPreviewChunks}
+                  selectedLocalFile={selectedLocalFile}
+                  chunkingStrategy={chunkingStrategy}
+                  chunkSize={chunkSize}
+                  chunkOverlap={chunkOverlap}
+                  keywords={keywords}
+                />
 
-                        <div className="space-y-2">
-                          <Label>Chunk Overlap (tokens)</Label>
-                          <Slider
-                            value={[chunkOverlap]}
-                            onValueChange={([value]: number[]) => setChunkOverlap(value)}
-                            min={0}
-                            max={500}
-                            step={50}
-                          />
-                          <p className="text-sm text-muted-foreground">
-                            {chunkOverlap} tokens overlap between chunks
-                          </p>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label>Preview Chunking</Label>
-                    <div className="flex gap-4">
-                      <Textarea
-                        placeholder="Enter some text to preview how it will be chunked..."
-                        value={previewText}
-                        onChange={(e) => setPreviewText(e.target.value)}
-                        className="min-h-[100px] flex-1"
-                      />
-                      <Button
-                        onClick={handlePreview}
-                        variant="outline"
-                        className="h-[100px]"
-                      >
-                        <Eye className="w-4 h-4 mr-2" />
-                        Preview
-                      </Button>
-                    </div>
-                  </div>
-
-                  {previewChunks.length > 0 && (
-                    <div className="space-y-2">
-                      <Label>Preview Results (First 5 Chunks)</Label>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {previewChunks.map((chunk, index) => (
-                          <Card key={index} className="p-4">
-                            <CardHeader className="p-0">
-                              <CardTitle className="text-sm">Chunk {index + 1}</CardTitle>
-                            </CardHeader>
-                            <CardContent className="p-0 mt-2">
-                              <p className="text-sm whitespace-pre-wrap">{chunk}</p>
-                            </CardContent>
-                          </Card>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                <Button
-                  onClick={handleUpload}
-                  disabled={!file || isUploading}
-                  className="w-full"
-                >
-                  {isUploading ? 'Processing...' : 'Upload and Process'}
-                </Button>
+                <RagUpload
+                  file={file}
+                  isUploading={isUploading}
+                  onUploadComplete={handleUploadComplete}
+                  chunkingStrategy={chunkingStrategy}
+                  chunkSize={chunkSize}
+                  chunkOverlap={chunkOverlap}
+                  keywords={keywords}
+                />
               </>
             )}
           </CardContent>
