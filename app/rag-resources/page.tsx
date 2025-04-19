@@ -17,6 +17,7 @@ import { RagChunkingConfig } from '@/components/rag/rag-chunking-config';
 import { RagPreview } from '@/components/rag/rag-preview';
 import { RagUpload } from '@/components/rag/rag-upload';
 import { ChunkingStrategy } from '@/lib/utils/chunking';
+import { ProcessedDocument } from '@/lib/utils/file-processing';
 
 interface AssetFile {
   name: string;
@@ -31,9 +32,10 @@ export default function RAGResourcesPage() {
   const [chunkSize, setChunkSize] = useState(1000);
   const [chunkOverlap, setChunkOverlap] = useState(200);
   const [isUploading, setIsUploading] = useState(false);
-  const [chunkingStrategy, setChunkingStrategy] = useState<ChunkingStrategy>('auto');
+  const [chunkingStrategy, setChunkingStrategy] = useState<ChunkingStrategy>('html');
   const [previewText, setPreviewText] = useState('');
   const [previewFormat, setPreviewFormat] = useState<'plain' | 'html' | 'markdown'>('plain');
+  const [previewMetadata, setPreviewMetadata] = useState<ProcessedDocument['metadata']>([]);
   const [previewChunks, setPreviewChunks] = useState<string[]>([]);
   const [keywords, setKeywords] = useState<string>('');
   const { isAdmin, isLoading } = useAdmin();
@@ -62,31 +64,54 @@ export default function RAGResourcesPage() {
 
       const blob = await response.blob();
       const file = new File([blob], path.split('/').pop() || 'document', {
-        type: blob.type
+        type: path.toLowerCase().endsWith('.docx')
+          ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+          : blob.type
       });
 
       const formData = new FormData();
       formData.append('file', file);
 
-      const processedDoc = await fetch("/api/rag/process-doc", {
-        method: 'POST',
-        body: formData,
-      }).then(res => res.json());
+      let processedDoc: ProcessedDocument;
+
+      if (file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+        processedDoc = await fetch("/api/process-file/word", {
+          method: 'POST',
+          body: formData,
+        }).then(res => res.json());
+      } else if (file.type === 'application/pdf') {
+        processedDoc = await fetch("/api/process-file/pdf", {
+          method: 'POST',
+          body: formData,
+        }).then(res => res.json());
+      } else if (file.name.toLowerCase().endsWith('.md')) {
+        processedDoc = await fetch("/api/process-file/markdown", {
+          method: 'POST',
+          body: formData,
+        }).then(res => res.json());
+      } else {
+        processedDoc = await fetch("/api/process-file/generic", {
+          method: 'POST',
+          body: formData,
+        }).then(res => res.json());
+      }
 
       setFile(file);
       setSelectedLocalFile(path);
       setPreviewText(processedDoc.text);
       setPreviewFormat(processedDoc.format);
+      setPreviewMetadata(processedDoc.metadata || []);
     } catch (error) {
       console.error('🟡 Error processing file:', error);
     }
   };
 
-  const handleFileSelect = (selectedFile: File, text: string, format: 'plain' | 'html' | 'markdown') => {
+  const handleFileSelect = (selectedFile: File, text: string, format: 'plain' | 'html' | 'markdown', metadata?: ProcessedDocument['metadata']) => {
     setFile(selectedFile);
     setSelectedLocalFile('');
     setPreviewText(text);
     setPreviewFormat(format);
+    setPreviewMetadata(metadata || []);
   };
 
   const handleUploadComplete = () => {
@@ -170,8 +195,6 @@ export default function RAGResourcesPage() {
                 <RagPreview
                   previewText={previewText}
                   onPreviewTextChange={setPreviewText}
-                  previewFormat={previewFormat}
-                  onPreviewFormatChange={setPreviewFormat}
                   previewChunks={previewChunks}
                   onPreviewChunksChange={setPreviewChunks}
                   selectedLocalFile={selectedLocalFile}
@@ -179,6 +202,9 @@ export default function RAGResourcesPage() {
                   chunkSize={chunkSize}
                   chunkOverlap={chunkOverlap}
                   keywords={keywords}
+                  format={previewFormat}
+                  metadata={previewMetadata}
+                  file={file}
                 />
 
                 <RagUpload

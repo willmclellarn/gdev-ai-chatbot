@@ -1,6 +1,8 @@
 'use server';
 
 import { JSDOM } from 'jsdom';
+import { ProcessedDocument } from './file-processing';
+import { myProvider } from '@/lib/ai/providers';
 
 export type ChunkingStrategy = 'token' | 'headers' | 'centered' | 'html' | 'keyword' | 'auto';
 
@@ -9,7 +11,9 @@ export interface ChunkingOptions {
   chunkSize: number;        // For token-based chunking fallback
   chunkOverlap: number;     // For token-based chunking fallback
   format: 'plain' | 'html' | 'markdown';
+  fileExtension: string;    // The actual file extension (e.g. 'html', 'md', 'txt')
   keywords?: string[];      // Optional keywords for keyword-based chunking
+  metadata?: ProcessedDocument['metadata']; // Optional metadata for preserving formatting
 }
 
 // or import cheerio from 'cheerio';
@@ -91,68 +95,90 @@ function splitByKeywords(text: string, keywords: string[]): string[] {
  */
 function improvedSplitByHtmlStructure(
   html: string,
-  chunkSize: number = 300,
-  chunkOverlap: number = 0,
   applyTokenFallback: boolean = false
-): string[] {
+): { chunks: string[], exceededChunkSize: boolean } {
   // Use JSDOM (or Cheerio, etc.) to parse the HTML
   const dom = new JSDOM(html);
   const document = dom.window.document;
+  let exceededChunkSize = false;
 
   // We will gather chunks by looking at top-level structural and header elements.
   // That includes <section>, <article>, <div>, <main>, <nav>, <aside>, <header>, <footer>
   // and <h1> through <h6> in the top-level or nested inside.
-  //
-  // The simplest approach:
-  // 1. Grab each of these elements as a "block" (outerHTML).
-  // 2. If a block is still large (by text content), optionally subdivide.
-
-  // A NodeList of all relevant elements
   const elements = Array.from(
     document.querySelectorAll('section, article, div, main, nav, aside, header, footer, h1, h2, h3, h4, h5, h6')
   );
 
-  const chunks: string[] = [];
+  console.log('🔵 [Chunking] Found', elements.length, 'elements to chunk');
 
-  // We'll track the previous node's end offset in the DOM
-  // (Although you can also do a simpler approach:
-  //  gather text between these major elements as separate chunks if needed.)
-  //
-  // For each element, we collect its outerHTML as a chunk boundary.
-  // The advantage of using outerHTML is that you keep the structure.
-  // If you want just text, use textContent.
+  const chunks: string[] = [];
 
   elements.forEach((element) => {
     const htmlElement = element as HTMLElement;
     const outer = htmlElement.outerHTML.trim();
 
-    // Optional: if you want the text of each chunk, you could do:
-    // const textContent = element.textContent ?? '';
-
     if (outer.length) {
-      // Optionally, do a length check before deciding if it's a final chunk
-      if (applyTokenFallback && outer.split(/\s+/).length > chunkSize) {
-        // If the chunk is too large, subdivide with token approach
-        const subdivided = splitByTokens(outer, chunkSize, chunkOverlap);
-        chunks.push(...subdivided);
+      const tokenCount = outer.split(/\s+/).length;
+      if (tokenCount > getMaxChunkSize()) {
+        exceededChunkSize = true;
+        if (applyTokenFallback) {
+          // If the chunk is too large, subdivide with token approach
+          const subdivided = splitByTokens(outer, getMaxChunkSize(), getMaxChunkOverlap());
+          chunks.push(...subdivided);
+        } else {
+          // If not applying token fallback, just add the large chunk with a warning
+          console.warn('🔵 [Chunking] Chunk size exceeded:', {
+            tokenCount,
+            maxAllowed: getMaxChunkSize(),
+            element: element.tagName
+          });
+          chunks.push(outer);
+        }
       } else {
         chunks.push(outer);
       }
     }
   });
 
-  // If there is content in the HTML that's *outside* these structural elements
-  // (like raw text or inline tags at the body root), you can optionally capture it:
-  //
-  // 1. Remove these known elements from the DOM.
-  // 2. Grab any leftover text from the body.
-  //
-  // This is optional but can be useful if you want to ensure everything is chunked.
+  // Handle text content outside of structural elements
+  const bodyText = document.body.textContent?.trim();
+  if (bodyText && bodyText.length > 0) {
+    const textChunks = splitByTokens(bodyText, getMaxChunkSize(), getMaxChunkOverlap());
+    chunks.push(...textChunks);
+  }
 
-  return chunks;
+  // If no chunks were created, fall back to token-based chunking of the entire HTML
+  if (chunks.length === 0) {
+    const fallbackChunks = splitByTokens(html, getMaxChunkSize(), getMaxChunkOverlap());
+    return { chunks: fallbackChunks, exceededChunkSize };
+  }
+
+  return { chunks, exceededChunkSize };
 }
 
-export function determineBestStrategy(fileType: string, content: string): ChunkingStrategy {
+function getMaxChunkSize(): number {
+  // Get the current embedding model from the provider
+  const currentModel = myProvider.textEmbeddingModel('small-model').modelId;
+
+  // Define token limits for different models
+  const modelTokenLimits: Record<string, number> = {
+    'text-embedding-3-small': 8192,
+    'text-embedding-3-large': 8192,
+    'text-embedding-ada-002': 8192,
+  };
+
+  // Get the token limit for the current model, defaulting to 8192 if unknown
+  const tokenLimit = modelTokenLimits[currentModel] || 8192;
+
+  // Return 50% of the token limit
+  return Math.floor(tokenLimit * 0.5);
+}
+
+function getMaxChunkOverlap(): number {
+  return 200;
+}
+
+export async function determineBestStrategy(fileType: string, content: string): Promise<ChunkingStrategy> {
   // Check file type first
   switch (fileType.toLowerCase()) {
     case 'md':
@@ -175,38 +201,65 @@ export function determineBestStrategy(fileType: string, content: string): Chunki
   }
 }
 
-export function splitTextIntoChunks(text: string, options: ChunkingOptions): string[] {
-  const { strategy, chunkSize, chunkOverlap, format, keywords } = options;
+export async function splitTextIntoChunks(text: string, options: ChunkingOptions): Promise<{ chunks: string[], strategy: ChunkingStrategy, exceededChunkSize?: boolean }> {
+  const { strategy, chunkSize, chunkOverlap, format, fileExtension, keywords } = options;
 
-  // If strategy is 'auto', determine the best strategy based on format
+  console.log('🔵 [Chunking] Starting text chunking with options:', {
+    requestedStrategy: strategy,
+    fileExtension,
+    format,
+    hasKeywords: !!keywords?.length,
+    chunkSize
+  });
+
+  // If strategy is 'auto', determine the best strategy based on file extension
   const effectiveStrategy = strategy === 'auto'
-    ? determineBestStrategy(format === 'html' ? 'html' : 'txt', text)
+    ? await determineBestStrategy(fileExtension, text)
     : strategy;
+
+  console.log('🔵 [Chunking] Selected strategy:', effectiveStrategy);
+
+  let chunks: string[];
+  let exceededChunkSize = false;
 
   switch (effectiveStrategy) {
     case 'headers':
-      return format === 'html'
+      console.log('🔵 [Chunking] Using header-based chunking');
+      chunks = format === 'html'
         ? splitByHtmlHeaders(text)
         : splitByHeaders(text);
+      break;
 
     case 'centered':
-      // For now, treat centered content the same as token-based
-      return splitByTokens(text, chunkSize, chunkOverlap);
+      console.log('🔵 [Chunking] Using centered content chunking');
+      chunks = splitByTokens(text, chunkSize, chunkOverlap);
+      break;
 
     case 'html':
-      // NEW: use improved DOM-based chunking for HTML
-      return improvedSplitByHtmlStructure(
+      console.log('🔵 [Chunking] Using HTML structure-based chunking');
+      const htmlResult = improvedSplitByHtmlStructure(
         text,
-        chunkSize,
-        chunkOverlap,
-        /* applyTokenFallback = */ true  // or false if you prefer not to subdivide large HTML elements
+        false
       );
+      chunks = htmlResult.chunks;
+      exceededChunkSize = htmlResult.exceededChunkSize;
+      break;
 
     case 'keyword':
-      return splitByKeywords(text, keywords || []);
+      console.log('🔵 [Chunking] Using keyword-based chunking with keywords:', keywords);
+      chunks = splitByKeywords(text, keywords || []);
+      break;
 
     case 'token':
     default:
-      return splitByTokens(text, chunkSize, chunkOverlap);
+      console.log('🔵 [Chunking] Using token-based chunking as fallback');
+      chunks = splitByTokens(text, chunkSize, chunkOverlap);
+      break;
   }
+
+  console.log('🔵 [Chunking] Generated', chunks.length, 'chunks using strategy:', effectiveStrategy);
+  if (exceededChunkSize) {
+    console.warn('🔵 [Chunking] Some chunks exceeded the maximum allowed size');
+  }
+  return { chunks, strategy: effectiveStrategy, exceededChunkSize };
 }

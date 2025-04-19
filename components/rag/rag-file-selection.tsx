@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { FileText, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { ProcessedDocument } from '@/lib/utils/file-processing';
 
 interface AssetFile {
   name: string;
@@ -12,7 +13,7 @@ interface AssetFile {
 }
 
 interface RagFileSelectionProps {
-  onFileSelect: (file: File, text: string, format: 'plain' | 'html' | 'markdown') => void;
+  onFileSelect: (file: File, text: string, format: 'plain' | 'html' | 'markdown', metadata?: ProcessedDocument['metadata']) => void;
   onLocalFileSelect: (path: string) => void;
   isLoadingFiles: boolean;
   localFiles: AssetFile[];
@@ -40,7 +41,7 @@ export function RagFileSelection({
           body: formData,
         }).then(res => res.json());
 
-        onFileSelect(selectedFile, processedDoc.text, processedDoc.format);
+        onFileSelect(selectedFile, processedDoc.text, processedDoc.format, processedDoc.metadata);
       } catch (error) {
         console.error('🟡 Error processing uploaded file:', error);
         toast.error('Failed to process uploaded file');

@@ -13,13 +13,25 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Ensure the file is a PDF file
+    if (!file.name.toLowerCase().endsWith('.pdf')) {
+      return NextResponse.json(
+        { error: 'File must be a PDF file' },
+        { status: 400 }
+      );
+    }
+
     const processedDoc = await extractTextFromFile(file);
 
-    return NextResponse.json(processedDoc);
+    return NextResponse.json({
+      text: processedDoc.text,
+      format: processedDoc.format,
+      metadata: processedDoc.metadata
+    });
   } catch (error) {
-    console.error('🔵 Error processing document:', error);
+    console.error('🔵 Error processing PDF file:', error);
     return NextResponse.json(
-      { error: 'Failed to process document' },
+      { error: 'Error processing PDF file' },
       { status: 500 }
     );
   }
