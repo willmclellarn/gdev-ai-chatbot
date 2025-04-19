@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS documents (
   chunk_size TEXT NOT NULL,
   chunk_overlap TEXT NOT NULL,
   total_chunks TEXT NOT NULL,
+  chunking_strategy TEXT NOT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
 );
 

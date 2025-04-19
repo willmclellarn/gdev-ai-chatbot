@@ -1,54 +1,28 @@
+'use server';
+
 import { NextResponse } from 'next/server';
-import { PineconeClient } from '@pinecone-database/pinecone';
-import { PDFParser } from 'pdf-parse';
-import { encoding_for_model } from 'tiktoken';
+import { Pinecone } from '@pinecone-database/pinecone';
+import pdfParse from 'pdf-parse';
 import OpenAI from 'openai';
-import { db } from '@/db';
-import { documents } from '@/drizzle/schema';
+import { db } from '@/lib/db';
+import { document } from '@/lib/db/schema';
+import { ChunkingStrategy, splitTextIntoChunks } from '@/lib/utils/chunking';
 
 // Initialize Pinecone client
-const pinecone = new PineconeClient();
-await pinecone.init({
-  apiKey: process.env.PINECONE_API_KEY!,
-  environment: process.env.PINECONE_ENVIRONMENT!,
-});
+const pinecone = new Pinecone();
 
 // Initialize OpenAI client
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-// Function to split text into chunks based on token count
-function splitTextIntoChunks(
-  text: string,
-  chunkSize: number,
-  chunkOverlap: number,
-): string[] {
-  const enc = encoding_for_model('text-embedding-ada-002');
-  const tokens = enc.encode(text);
-  const chunks: string[] = [];
-
-  let i = 0;
-  while (i < tokens.length) {
-    const chunkTokens = tokens.slice(i, i + chunkSize);
-    const chunkText = enc.decode(chunkTokens);
-    chunks.push(chunkText);
-
-    i += chunkSize - chunkOverlap;
-  }
-
-  enc.free();
-  return chunks;
-}
-
 export async function POST(request: Request) {
   try {
     const formData = await request.formData();
     const file = formData.get('file') as File;
     const chunkSize = Number.parseInt(formData.get('chunkSize') as string);
-    const chunkOverlap = Number.parseInt(
-      formData.get('chunkOverlap') as string,
-    );
+    const chunkOverlap = Number.parseInt(formData.get('chunkOverlap') as string);
+    const chunkingStrategy = formData.get('chunkingStrategy') as ChunkingStrategy;
 
     if (!file) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 });
@@ -56,21 +30,26 @@ export async function POST(request: Request) {
 
     // Read PDF content
     const buffer = await file.arrayBuffer();
-    const pdfData = await PDFParser(Buffer.from(buffer));
+    const pdfData = await pdfParse(Buffer.from(buffer));
     const text = pdfData.text;
 
-    // Split text into chunks
-    const chunks = splitTextIntoChunks(text, chunkSize, chunkOverlap);
+    // Split text into chunks using the selected strategy
+    const chunks = splitTextIntoChunks(text, {
+      strategy: chunkingStrategy,
+      chunkSize,
+      chunkOverlap,
+    });
 
     // Store document in Drizzle/Postgres
     const [document] = await db
-      .insert(documents)
+      .insert(document)
       .values({
         filename: file.name,
         content: text,
         chunkSize: chunkSize.toString(),
         chunkOverlap: chunkOverlap.toString(),
         totalChunks: chunks.length.toString(),
+        chunkingStrategy,
       })
       .returning();
 
@@ -90,6 +69,7 @@ export async function POST(request: Request) {
             source: file.name,
             documentId: document.id,
             chunkIndex: index,
+            chunkingStrategy,
           },
         };
       }),

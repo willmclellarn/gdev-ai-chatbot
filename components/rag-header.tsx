@@ -24,14 +24,17 @@ import {
   ChevronDownIcon,
   UserIcon,
   UsersIcon,
+  GlobeIcon,
 } from './icons';
+import { useAdmin } from '@/hooks/use-admin';
 
 function PureRAGHeader() {
   const router = useRouter();
   const { open } = useSidebar();
   const { width: windowWidth } = useWindowSize();
   const [embeddingModel, setEmbeddingModel] = useState(embeddingModels[0]);
-  const [isOrganization, setIsOrganization] = useState(false);
+  const [resourceScope, setResourceScope] = useState<'user' | 'org' | 'admin'>('user');
+  const { isAdmin } = useAdmin();
 
   return (
     <header className="flex sticky top-0 bg-background py-1.5 items-center px-2 md:px-2 gap-2">
@@ -94,18 +97,18 @@ function PureRAGHeader() {
             variant="outline"
             className="order-1 md:order-3 md:px-2 md:h-[34px]"
           >
-            {isOrganization ? <UsersIcon /> : <UserIcon />}
+            {resourceScope === 'user' ? <UserIcon /> : resourceScope === 'org' ? <UsersIcon /> : <GlobeIcon />}
             <span className="ml-2">
-              {isOrganization ? 'Organization' : 'Personal'}
+              {resourceScope === 'user' ? 'Personal' : resourceScope === 'org' ? 'Organization' : 'System-wide'}
             </span>
             <ChevronDownIcon />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="min-w-[200px]">
           <DropdownMenuItem
-            onSelect={() => setIsOrganization(false)}
+            onSelect={() => setResourceScope('user')}
             className="gap-4 group/item flex flex-row justify-between items-center"
-            data-active={!isOrganization}
+            data-active={resourceScope === 'user'}
           >
             <div className="flex flex-col gap-1 items-start">
               <div>Personal</div>
@@ -118,9 +121,9 @@ function PureRAGHeader() {
             </div>
           </DropdownMenuItem>
           <DropdownMenuItem
-            onSelect={() => setIsOrganization(true)}
+            onSelect={() => setResourceScope('org')}
             className="gap-4 group/item flex flex-row justify-between items-center"
-            data-active={isOrganization}
+            data-active={resourceScope === 'org'}
           >
             <div className="flex flex-col gap-1 items-start">
               <div>Organization</div>
@@ -132,6 +135,23 @@ function PureRAGHeader() {
               <CheckCircleFillIcon />
             </div>
           </DropdownMenuItem>
+          {isAdmin && (
+            <DropdownMenuItem
+              onSelect={() => setResourceScope('admin')}
+              className="gap-4 group/item flex flex-row justify-between items-center"
+              data-active={resourceScope === 'admin'}
+            >
+              <div className="flex flex-col gap-1 items-start">
+                <div>System-wide</div>
+                <div className="text-xs text-muted-foreground">
+                  Available to all users in the system
+                </div>
+              </div>
+              <div className="text-foreground dark:text-foreground opacity-0 group-data-[active=true]/item:opacity-100">
+                <CheckCircleFillIcon />
+              </div>
+            </DropdownMenuItem>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
     </header>

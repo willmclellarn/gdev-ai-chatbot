@@ -5,25 +5,27 @@ import { eq } from 'drizzle-orm';
 
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  console.log('🔵 GET /api/organizations/[id] - Starting request for orgId:', params.id);
+  const { id } = await params;
+
+  // console.log('🔵 GET /api/organizations/[id] - Starting request for orgId:', id);
   try {
     const [org] = await db
       .select()
       .from(organization)
-      .where(eq(organization.id, params.id))
+      .where(eq(organization.id, id))
       .limit(1);
 
     if (!org) {
-      console.log('🔵 GET /api/organizations/[id] - Organization not found for id:', params.id);
+      console.log('🔴 GET /api/organizations/[id] - Organization not found for id:', id);
       return NextResponse.json(
         { error: 'Organization not found' },
         { status: 404 }
       );
     }
 
-    console.log('🔵 GET /api/organizations/[id] - Successfully fetched organization:', org);
+    // console.log('🔵 GET /api/organizations/[id] - Successfully fetched organization:', org);
     return NextResponse.json(org);
   } catch (error) {
     console.error('🔵 GET /api/organizations/[id] - Error fetching organization:', error);
