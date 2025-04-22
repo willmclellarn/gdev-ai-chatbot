@@ -1,7 +1,26 @@
 'use server';
 
 import mammoth from 'mammoth';
+import JSZip from 'jszip';
+import { parseStringPromise } from 'xml2js';
+import * as cheerio from 'cheerio';
 import pdfParse from 'pdf-parse';
+
+
+/**
+ * Extracts paragraph alignment values from a DOCX ArrayBuffer.
+ */
+async function getParagraphAlignments(buffer: ArrayBuffer): Promise<Array<'left'|'center'|'right'|'justify'|undefined>> {
+  const zip = await JSZip.loadAsync(Buffer.from(buffer));
+  const xmlStr = await zip.file('word/document.xml')!.async('string');
+  const doc = await parseStringPromise(xmlStr);
+  const paras = doc['w:document']['w:body'][0]['w:p'] || [];
+  return paras.map((p: any) => {
+    const jc = p['w:pPr']?.[0]['w:jc']?.[0].$['w:val'];
+    if (jc === 'both') return 'justify';
+    return jc as any;
+  });
+}
 
 /**
  * Represents a processed document with its extracted content and metadata.
@@ -138,7 +157,7 @@ export async function extractTextFromFile(file: File): Promise<ProcessedDocument
       fileType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
       fileType === 'application/msword'
     ) {
-      // First embed the style map
+      // First embed the style map (no synthetic alignment rules)
       const styleMap = [
         // Base rules
         "p => p:fresh",
@@ -165,54 +184,27 @@ export async function extractTextFromFile(file: File): Promise<ProcessedDocument
         "r[style-name='underline'] => u:fresh",
         "r[style-name='strikethrough'] => del:fresh",
         "r[style-name='superscript'] => sup:fresh",
-        "r[style-name='subscript'] => sub:fresh"
+        "r[style-name='subscript'] => sub:fresh",
       ].join('\n');
 
-      const embeddedDoc = await mammoth.embedStyleMap(
-        { buffer: Buffer.from(arrayBuffer) },
-        styleMap
-      );
-
-      // Then convert to HTML
+      // Convert to HTML without transforms
       const result = await mammoth.convertToHtml(
-        { buffer: embeddedDoc.toBuffer() },
-        {
-          transformDocument: (document) => {
-            document.children.forEach((child: {
-              type: string;
-              styleName?: string;
-              alignment?: string;
-              children?: Array<{
-                type: string;
-                value?: string;
-                styleName?: string;
-                children?: Array<{
-                  type: string;
-                  value?: string;
-                }>;
-              }>;
-            }) => {
-              if (child.type === 'paragraph') {
-                // Handle alignment through the document transformation
-                if (child.alignment) {
-                  const alignmentStyle = `text-align: ${child.alignment}`;
-                  if (child.styleName?.toLowerCase().includes('heading')) {
-                    const headingLevel = child.styleName.split(' ')[1];
-                    child.styleName = `h${headingLevel}[style='${alignmentStyle}']`;
-                  } else if (child.styleName === 'quote') {
-                    child.styleName = `blockquote[style='${alignmentStyle}']`;
-                  } else {
-                    child.styleName = `p[style='${alignmentStyle}']`;
-                  }
-                }
-              }
-            });
-            return document;
-          }
-        }
+        { buffer: Buffer.from(arrayBuffer) },
+        { styleMap }
       );
 
-      text = result.value;
+      // Apply real DOCX alignments via post-processing
+      const alignments = await getParagraphAlignments(arrayBuffer);
+      const $ = cheerio.load(result.value);
+      $('p').each((i, el) => {
+        const align = alignments[i];
+        if (align) {
+          const existing = $(el).attr('style') || '';
+          const sep = existing.trim() ? ';' : '';
+          $(el).attr('style', `${existing}${sep}text-align:${align}`);
+        }
+      });
+      text = $('body').html() || '';
       format = 'html';
 
       // Enhanced metadata extraction for Google Docs
