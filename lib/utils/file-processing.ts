@@ -1,26 +1,6 @@
 'use server';
 
 import mammoth from 'mammoth';
-import JSZip from 'jszip';
-import { parseStringPromise } from 'xml2js';
-import * as cheerio from 'cheerio';
-import pdfParse from 'pdf-parse';
-
-
-/**
- * Extracts paragraph alignment values from a DOCX ArrayBuffer.
- */
-async function getParagraphAlignments(buffer: ArrayBuffer): Promise<Array<'left'|'center'|'right'|'justify'|undefined>> {
-  const zip = await JSZip.loadAsync(Buffer.from(buffer));
-  const xmlStr = await zip.file('word/document.xml')!.async('string');
-  const doc = await parseStringPromise(xmlStr);
-  const paras = doc['w:document']['w:body'][0]['w:p'] || [];
-  return paras.map((p: any) => {
-    const jc = p['w:pPr']?.[0]['w:jc']?.[0].$['w:val'];
-    if (jc === 'both') return 'justify';
-    return jc as any;
-  });
-}
 
 /**
  * Represents a processed document with its extracted content and metadata.
@@ -90,70 +70,8 @@ export async function extractTextFromFile(file: File): Promise<ProcessedDocument
   const base64File = arrayBufferToBase64(arrayBuffer);
 
   try {
-    // Handle PDF files
-    if (fileType === 'application/pdf') {
-      const pdfData = await pdfParse(Buffer.from(arrayBuffer));
-      text = pdfData.text;
-
-      // Improved PDF formatting detection
-      const lines = text.split('\n');
-      text = lines.map((line, index) => {
-        const trimmedLine = line.trim();
-
-        // Skip empty lines
-        if (!trimmedLine) return line;
-
-        // Detect centered text using multiple heuristics
-        const lineLength = line.length;
-        const trimmedLength = trimmedLine.length;
-        const leadingSpaces = line.length - line.trimStart().length;
-        const trailingSpaces = line.length - line.trimEnd().length;
-
-        // Heuristic 1: Text is significantly shorter than line width
-        const isShortLine = trimmedLength < lineLength * 0.8;
-
-        // Heuristic 2: Text has roughly equal leading and trailing spaces
-        const isBalancedSpacing = Math.abs(leadingSpaces - trailingSpaces) < 3;
-
-        // Heuristic 3: Text is surrounded by significant whitespace
-        const hasSignificantWhitespace = leadingSpaces > 2 && trailingSpaces > 2;
-
-        // Heuristic 4: Text appears to be centered based on visual layout
-        const isCentered = (isShortLine && isBalancedSpacing) ||
-                          (hasSignificantWhitespace && isBalancedSpacing);
-
-        // Detect potential headers (all caps, shorter lines)
-        const isHeader = trimmedLength > 0 &&
-          trimmedLength < 100 &&
-          trimmedLine === trimmedLine.toUpperCase();
-
-        // Detect potential bold text
-        const isBold = line.includes('**') ||
-          (trimmedLength > 0 && trimmedLine === trimmedLine.toUpperCase());
-
-        metadata.push({
-          styles: {
-            bold: isBold,
-            alignment: isCentered ? 'center' : 'left',
-            fontSize: isHeader ? 16 : 12, // Approximate font sizes
-          }
-        });
-
-        if (isHeader) {
-          return `<h2>${trimmedLine}</h2>`;
-        } else if (isCentered) {
-          return `<p style="text-align: center">${trimmedLine}</p>`;
-        } else if (isBold) {
-          return `<strong>${trimmedLine}</strong>`;
-        }
-        return line;
-      }).join('\n');
-
-      format = 'html';
-    }
-
     // Handle Microsoft Word documents
-    else if (
+    if (
       fileType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
       fileType === 'application/msword'
     ) {
@@ -193,19 +111,10 @@ export async function extractTextFromFile(file: File): Promise<ProcessedDocument
         { styleMap }
       );
 
-      // Apply real DOCX alignments via post-processing
-      const alignments = await getParagraphAlignments(arrayBuffer);
-      const $ = cheerio.load(result.value);
-      $('p').each((i, el) => {
-        const align = alignments[i];
-        if (align) {
-          const existing = $(el).attr('style') || '';
-          const sep = existing.trim() ? ';' : '';
-          $(el).attr('style', `${existing}${sep}text-align:${align}`);
-        }
-      });
-      text = $('body').html() || '';
+      text = result.value;
       format = 'html';
+
+      console.log('🔵 HTML result:', text);
 
       // Enhanced metadata extraction for Google Docs
       if (result.messages) {

@@ -8,6 +8,8 @@ import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { ProcessedDocument } from '@/lib/utils/file-processing';
 import { useEffect, useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Maximize2, Minimize2 } from 'lucide-react';
 
 interface RagDocumentPreviewProps {
   previewText: string;
@@ -26,8 +28,8 @@ export function RagDocumentPreview({
   format = 'plain',
   metadata = [],
 }: RagDocumentPreviewProps) {
-
   const [preview, setPreview] = useState(previewText);
+  const [isFullScreen, setIsFullScreen] = useState(false);
 
   useEffect(() => {
     if (previewText) {
@@ -35,9 +37,36 @@ export function RagDocumentPreview({
     }
   }, [previewText]);
 
+  const toggleFullScreen = () => {
+    setIsFullScreen(!isFullScreen);
+  };
+
   return (
-    <div className="space-y-2">
-      <Label>Document Preview</Label>
+    <div className={cn(
+      "space-y-2",
+      isFullScreen ? "fixed top-0 right-0 bottom-0 w-[calc(100%-16rem)] z-50 bg-background p-4 border-l" : ""
+    )}>
+      <div className="space-y-2">
+        <Label>Document Preview</Label>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={toggleFullScreen}
+          className="flex items-center gap-2"
+        >
+          {isFullScreen ? (
+            <>
+              <Minimize2 className="h-4 w-4" />
+              <span>Exit Preview</span>
+            </>
+          ) : (
+            <>
+              <Maximize2 className="h-4 w-4" />
+              <span>Expand Preview</span>
+            </>
+          )}
+        </Button>
+      </div>
       <div className="flex items-center justify-between">
         <span className="text-sm text-muted-foreground">
           {chunkingStrategy === 'auto'
@@ -47,7 +76,10 @@ export function RagDocumentPreview({
       </div>
       <div className="relative">
         {selectedLocalFile ? (
-          <ScrollArea className="h-[400px] border rounded-md">
+          <ScrollArea className={cn(
+            "border rounded-md",
+            isFullScreen ? "h-[calc(100vh-8rem)]" : "h-[400px]"
+          )}>
             <div className={cn(
               "p-4 prose dark:prose-invert max-w-none",
               "bg-background",
@@ -75,7 +107,10 @@ export function RagDocumentPreview({
             placeholder="Enter some text to preview how it will be chunked..."
             value={previewText}
             onChange={(e) => onPreviewTextChange(e.target.value)}
-            className="h-[400px] font-mono text-sm"
+            className={cn(
+              "font-mono text-sm",
+              isFullScreen ? "h-[calc(100vh-8rem)]" : "h-[400px]"
+            )}
           />
         )}
         <div className="absolute bottom-2 right-2 text-xs text-muted-foreground">
