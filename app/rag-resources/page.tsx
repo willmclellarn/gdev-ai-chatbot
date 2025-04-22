@@ -18,6 +18,7 @@ import { RagPreview } from '@/components/rag/rag-preview';
 import { RagUpload } from '@/components/rag/rag-upload';
 import { ChunkingStrategy } from '@/lib/utils/chunking';
 import { ProcessedDocument } from '@/lib/utils/file-processing';
+import { useGlobalState } from '@/hooks/use-global-state';
 
 interface AssetFile {
   name: string;
@@ -29,7 +30,7 @@ export default function RAGResourcesPage() {
   const [selectedLocalFile, setSelectedLocalFile] = useState<string>('');
   const [localFiles, setLocalFiles] = useState<AssetFile[]>([]);
   const [isLoadingFiles, setIsLoadingFiles] = useState(true);
-  const [chunkSize, setChunkSize] = useState(1000);
+  const [chunkSize, setChunkSize] = useState(500);
   const [chunkOverlap, setChunkOverlap] = useState(200);
   const [isUploading, setIsUploading] = useState(false);
   const [chunkingStrategy, setChunkingStrategy] = useState<ChunkingStrategy>('token');
@@ -38,7 +39,9 @@ export default function RAGResourcesPage() {
   const [previewMetadata, setPreviewMetadata] = useState<ProcessedDocument['metadata']>([]);
   const [previewChunks, setPreviewChunks] = useState<string[]>([]);
   const [keywords, setKeywords] = useState<string>('');
+  const [hasChunkingChanges, setHasChunkingChanges] = useState(false);
   const { isAdmin, isLoading } = useAdmin();
+  const { state: { embeddingModel } } = useGlobalState();
 
   useEffect(() => {
     const fetchLocalFiles = async () => {
@@ -56,6 +59,43 @@ export default function RAGResourcesPage() {
 
     fetchLocalFiles();
   }, []);
+
+  useEffect(() => {
+    const defaultSettings = {
+      chunkSize: 1000,
+      chunkOverlap: 200,
+      chunkingStrategy: 'token' as ChunkingStrategy,
+      keywords: ''
+    };
+
+    const currentSettings = {
+      chunkSize,
+      chunkOverlap,
+      chunkingStrategy,
+      keywords
+    };
+
+    setHasChunkingChanges(
+      JSON.stringify(currentSettings) !== JSON.stringify(defaultSettings)
+    );
+  }, [chunkSize, chunkOverlap, chunkingStrategy, keywords]);
+
+  const handleSaveDefault = async () => {
+    const response = await fetch('/api/rag/preferences', {
+      method: 'POST',
+      body: JSON.stringify({
+        chunkingStrategy,
+        chunkSize,
+        chunkOverlap,
+      }),
+    });
+
+    if (!response.ok) {
+      console.error('Failed to save default settings');
+    }
+
+    setHasChunkingChanges(false);
+  };
 
   const handleLocalFileSelect = async (path: string) => {
     try {
@@ -122,7 +162,10 @@ export default function RAGResourcesPage() {
   if (isLoading) {
     return (
       <div className="flex flex-col h-full">
-        <RAGHeader />
+        <RAGHeader
+          hasChanges={hasChunkingChanges}
+          onSaveDefault={handleSaveDefault}
+        />
         <div className="container mx-auto py-8 flex-1">
           <Card>
             <CardHeader>
@@ -137,7 +180,10 @@ export default function RAGResourcesPage() {
 
   return (
     <div className="flex flex-col h-full">
-      <RAGHeader />
+      <RAGHeader
+        hasChanges={hasChunkingChanges}
+        onSaveDefault={handleSaveDefault}
+      />
       {isAdmin && (
         <div className="container mx-auto px-4 py-2">
           <Alert className="bg-yellow-50 border-yellow-200/50 text-yellow-800">
@@ -215,6 +261,8 @@ export default function RAGResourcesPage() {
                   chunkSize={chunkSize}
                   chunkOverlap={chunkOverlap}
                   keywords={keywords}
+                  embeddingModel={embeddingModel}
+                  selectedLocalFile={selectedLocalFile}
                 />
               </>
             )}

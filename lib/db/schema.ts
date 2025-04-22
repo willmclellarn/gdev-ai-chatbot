@@ -216,3 +216,15 @@ export const prompt = pgTable('Prompt', {
 
 export type Prompt = InferSelectModel<typeof prompt>;
 
+export const userPreferences = pgTable('UserPreferences', {
+  id: uuid('id').primaryKey().notNull().defaultRandom(),
+  userId: uuid('userId')
+    .notNull()
+    .references(() => user.id),
+  chunkSize: text('chunkSize').notNull(),
+  chunkOverlap: text('chunkOverlap').notNull(),
+  chunkingStrategy: text('chunkingStrategy').notNull(),
+  createdAt: timestamp('createdAt').notNull().defaultNow(),
+  updatedAt: timestamp('updatedAt').notNull().defaultNow(),
+});
+

@@ -1,6 +1,7 @@
 'use server';
 
 import mammoth from 'mammoth';
+import { ChunkingStrategy, splitTextIntoChunks } from './chunking';
 
 /**
  * Represents a processed document with its extracted content and metadata.
@@ -48,7 +49,7 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
  *
  * Returns the extracted text, format, metadata, and a base64 representation of the original file.
  */
-export async function extractTextFromFile(file: File): Promise<ProcessedDocument> {
+export async function extractTextFromFile(file: File, options?: { makePlainText?: boolean }): Promise<ProcessedDocument> {
   const fileType = file.type;
   console.log('🔵 File processing details:', {
     fileName: file.name,
@@ -154,6 +155,10 @@ export async function extractTextFromFile(file: File): Promise<ProcessedDocument
       throw new Error('Unsupported file type');
     }
 
+    if (options?.makePlainText) {
+      text = await makePlainText(text);
+    }
+
     return {
       text,
       format,
@@ -164,4 +169,35 @@ export async function extractTextFromFile(file: File): Promise<ProcessedDocument
     console.error('🔵 Error extracting text from file:', error);
     throw error;
   }
+}
+
+function makePlainText(text: string): string {
+  // remove all HTML formatting
+  return text.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ');
+}
+
+interface ChunkingOptions {
+  strategy: ChunkingStrategy;
+  chunkSize: number;
+  chunkOverlap: number;
+  keywords?: string;
+}
+
+export async function processFileWithChunking(
+  file: File,
+  options: ChunkingOptions
+): Promise<string[]> {
+  const text = await file.text();
+  const fileExtension = file.name.split('.').pop()?.toLowerCase() || 'txt';
+
+  const { chunks } = await splitTextIntoChunks(text, {
+    strategy: options.strategy,
+    chunkSize: options.chunkSize,
+    chunkOverlap: options.chunkOverlap,
+    format: 'plain',
+    fileExtension,
+    keywords: options.keywords ? options.keywords.split(',').map(k => k.trim()) : undefined,
+  });
+
+  return chunks;
 }

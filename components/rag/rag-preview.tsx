@@ -10,13 +10,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Eye } from 'lucide-react';
+import { Eye, Save } from 'lucide-react';
 import { toast } from 'sonner';
 import { ChunkingStrategy } from '@/lib/utils/chunking';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { RagDocumentPreview } from './rag-document-preview';
 import { extractTextFromFile, ProcessedDocument } from '@/lib/utils/file-processing';
 import { createRagFormData } from '@/lib/utils/form-data';
+import { useSession } from 'next-auth/react';
 
 interface RagPreviewProps {
   previewText: string;
@@ -48,11 +49,65 @@ export function RagPreview({
   file,
 }: RagPreviewProps) {
   const [actualStrategy, setActualStrategy] = useState<ChunkingStrategy | null>(null);
+  const { data: session } = useSession();
+
+  useEffect(() => {
+    const loadPreferences = async () => {
+      if (!session?.user?.id) return;
+
+      try {
+        const response = await fetch('/api/rag/preferences');
+        if (response.ok) {
+          const preferences = await response.json();
+          if (preferences) {
+            onPreviewTextChange(preferences.chunkSize);
+            onPreviewChunksChange(preferences.chunkOverlap);
+            setActualStrategy(preferences.chunkingStrategy as ChunkingStrategy);
+          }
+        }
+      } catch (error) {
+        console.error('Error loading preferences:', error);
+      }
+    };
+
+    loadPreferences();
+  }, [session]);
+
+  const savePreferences = async () => {
+    if (!session?.user?.id) {
+      toast.error('You must be logged in to save preferences');
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/rag/preferences', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          chunkSize,
+          chunkOverlap,
+          chunkingStrategy,
+        }),
+      });
+
+      if (response.ok) {
+        toast.success('Preferences saved successfully');
+      } else {
+        toast.error('Failed to save preferences');
+      }
+    } catch (error) {
+      console.error('Error saving preferences:', error);
+      toast.error('Failed to save preferences');
+    }
+  };
 
   const generatePreview = async () => {
     try {
       if (!file) {
         toast.error('No file provided');
+        onPreviewChunksChange([]);
         return;
       }
 
@@ -75,17 +130,19 @@ export function RagPreview({
       if (!result.ok) {
         const errorText = await result.text();
         console.error('🔵 Rag Preview API error:', errorText);
+        onPreviewChunksChange([]);
         return;
       }
 
       const data = await result.json();
       onPreviewTextChange(data.previewText);
-      onPreviewChunksChange(data.chunks);
+      onPreviewChunksChange(data.chunks || []);
       if (chunkingStrategy === 'auto') {
         setActualStrategy(data.strategy);
       }
     } catch (error) {
       console.error("🔴 Rag Preview generatePreview error:", error);
+      onPreviewChunksChange([]);
     }
   };
 
@@ -104,14 +161,24 @@ export function RagPreview({
         metadata={metadata}
       />
 
-      <Button
-        onClick={handlePreview}
-        variant="outline"
-        className="w-full"
-      >
-        <Eye className="w-4 h-4 mr-2" />
-        Preview Chunks
-      </Button>
+      <div className="flex gap-2">
+        <Button
+          onClick={handlePreview}
+          variant="outline"
+          className="flex-1"
+        >
+          <Eye className="w-4 h-4 mr-2" />
+          Preview Chunks
+        </Button>
+        <Button
+          onClick={savePreferences}
+          variant="outline"
+          className="flex-1"
+        >
+          <Save className="w-4 h-4 mr-2" />
+          Save as Default
+        </Button>
+      </div>
 
       {previewChunks.length > 0 && (
         <div className="space-y-2">
@@ -124,7 +191,7 @@ export function RagPreview({
             </span>
           </div>
           <div className="space-y-4">
-            {previewChunks.map((chunk, index) => (
+            {(Array.isArray(previewChunks) ? previewChunks.slice(0, 5) : []).map((chunk, index) => (
               <Card key={index} className="p-4">
                 <CardHeader className="p-0">
                   <CardTitle className="text-sm">Chunk {index + 1}</CardTitle>

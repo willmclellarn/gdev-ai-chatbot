@@ -1,12 +1,12 @@
 export const DEFAULT_CHAT_MODEL: string = 'chat-model';
 
-interface ChatModel {
+export interface ChatModel {
   id: string;
   name: string;
   description: string;
 }
 
-interface EmbeddingModel {
+export interface EmbeddingModel {
   id: string;
   name: string;
   description: string;

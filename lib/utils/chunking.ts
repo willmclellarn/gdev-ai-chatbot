@@ -16,8 +16,6 @@ export interface ChunkingOptions {
   metadata?: ProcessedDocument['metadata']; // Optional metadata for preserving formatting
 }
 
-// or import cheerio from 'cheerio';
-
 function splitByHeaders(text: string): string[] {
   // Split by markdown headers
   const headerRegex = /^#{1,6}\s+.+$/gm;
@@ -251,6 +249,10 @@ export async function splitTextIntoChunks(text: string, options: ChunkingOptions
       break;
 
     case 'token':
+      console.log('🔵 [Chunking] Using token-based chunking');
+      chunks = splitByTokens(text, chunkSize, chunkOverlap);
+      break;
+
     default:
       console.log('🔵 [Chunking] Using token-based chunking as fallback');
       chunks = splitByTokens(text, chunkSize, chunkOverlap);

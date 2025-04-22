@@ -7,7 +7,7 @@ import { useState } from 'react';
 
 import { SidebarToggle } from '@/components/sidebar-toggle';
 import { Button } from '@/components/ui/button';
-import { PlusIcon } from '../icons';
+import { PlusIcon, DownloadIcon } from '../icons';
 import { useSidebar } from '../ui/sidebar';
 import { memo } from 'react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip';
@@ -18,7 +18,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { embeddingModels } from '@/lib/ai/models';
-import { cn } from '@/lib/utils';
 import {
   CheckCircleFillIcon,
   ChevronDownIcon,
@@ -27,12 +26,18 @@ import {
   GlobeIcon,
 } from '../icons';
 import { useAdmin } from '@/hooks/use-admin';
+import { useGlobalState } from '@/hooks/use-global-state';
 
-function PureRAGHeader() {
+interface RAGHeaderProps {
+  hasChanges?: boolean;
+  onSaveDefault?: () => void;
+}
+
+function PureRAGHeader({ hasChanges = false, onSaveDefault }: RAGHeaderProps) {
   const router = useRouter();
   const { open } = useSidebar();
   const { width: windowWidth } = useWindowSize();
-  const [embeddingModel, setEmbeddingModel] = useState(embeddingModels[0]);
+  const { state: { embeddingModel }, setState: setEmbeddingModel } = useGlobalState();
   const [resourceScope, setResourceScope] = useState<'user' | 'org' | 'admin'>('user');
   const { isAdmin } = useAdmin();
 
@@ -73,7 +78,7 @@ function PureRAGHeader() {
           {embeddingModels.map((model) => (
             <DropdownMenuItem
               key={model.id}
-              onSelect={() => setEmbeddingModel(model)}
+              onSelect={() => setEmbeddingModel({ embeddingModel: model })}
               className="gap-4 group/item flex flex-row justify-between items-center"
               data-active={model.id === embeddingModel.id}
             >
@@ -154,6 +159,22 @@ function PureRAGHeader() {
           )}
         </DropdownMenuContent>
       </DropdownMenu>
+
+      {hasChanges && onSaveDefault && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="default"
+              className="order-1 md:order-4 md:px-2 md:h-[34px]"
+              onClick={onSaveDefault}
+            >
+              <DownloadIcon />
+              <span className="ml-2">Save Default</span>
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Save current chunking settings as default</TooltipContent>
+        </Tooltip>
+      )}
     </header>
   );
 }

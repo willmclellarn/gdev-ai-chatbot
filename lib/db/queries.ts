@@ -6,7 +6,7 @@ import type { SQL } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 
-import { user, chat, document, suggestion, message, vote } from './schema';
+import { user, chat, document, suggestion, message, vote, userPreferences } from './schema';
 import type { User, Suggestion, DBMessage, Chat } from './schema';
 import type { ArtifactKind } from '@/components/artifact';
 
@@ -218,33 +218,33 @@ export async function getVotesByChatId({ id }: { id: string }) {
   }
 }
 
-export async function saveDocument({
-  id,
-  title,
-  kind,
-  content,
-  userId,
-}: {
-  id: string;
-  title: string;
-  kind: ArtifactKind;
-  content: string;
-  userId: string;
-}) {
-  try {
-    return await db.insert(document).values({
-      id,
-      title,
-      kind,
-      content,
-      userId,
-      createdAt: new Date(),
-    });
-  } catch (error) {
-    console.error('Failed to save document in database');
-    throw error;
-  }
-}
+// export async function saveDocument({
+//   id,
+//   title,
+//   kind,
+//   content,
+//   userId,
+// }: {
+//   id: string;
+//   title: string;
+//   kind: ArtifactKind;
+//   content: string;
+//   userId: string;
+// }) {
+//   try {
+//     return await db.insert(document).values({
+//       id,
+//       title,
+//       kind,
+//       content,
+//       userId,
+//       createdAt: new Date(),
+//     });
+//   } catch (error) {
+//     console.error('Failed to save document in database');
+//     throw error;
+//   }
+// }
 
 export async function getDocumentsById({ id }: { id: string }) {
   try {
@@ -393,6 +393,55 @@ export async function updateChatVisiblityById({
     return await db.update(chat).set({ visibility }).where(eq(chat.id, chatId));
   } catch (error) {
     console.error('Failed to update chat visibility in database');
+    throw error;
+  }
+}
+
+export async function saveUserPreferences(
+  userId: string,
+  chunkingStrategy: string,
+  chunkSize: string,
+  chunkOverlap: string,
+) {
+  try {
+    const existingPrefs = await db
+      .select()
+      .from(userPreferences)
+      .where(eq(userPreferences.userId, userId));
+
+    if (existingPrefs.length > 0) {
+      await db
+        .update(userPreferences)
+        .set({
+          chunkSize,
+          chunkOverlap,
+          chunkingStrategy,
+          updatedAt: new Date(),
+        })
+        .where(eq(userPreferences.userId, userId));
+    } else {
+      await db.insert(userPreferences).values({
+        userId,
+        chunkSize,
+        chunkOverlap,
+        chunkingStrategy,
+      });
+    }
+  } catch (error) {
+    console.error(`Failed to save user preferences: ${error}`);
+    throw error;
+  }
+}
+
+export async function getUserPreferences(userId: string) {
+  try {
+    const prefs = await db
+      .select()
+      .from(userPreferences)
+      .where(eq(userPreferences.userId, userId));
+    return prefs[0] || null;
+  } catch (error) {
+    console.error(`Failed to get user preferences: ${error}`);
     throw error;
   }
 }
