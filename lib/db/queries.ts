@@ -218,33 +218,33 @@ export async function getVotesByChatId({ id }: { id: string }) {
   }
 }
 
-// export async function saveDocument({
-//   id,
-//   title,
-//   kind,
-//   content,
-//   userId,
-// }: {
-//   id: string;
-//   title: string;
-//   kind: ArtifactKind;
-//   content: string;
-//   userId: string;
-// }) {
-//   try {
-//     return await db.insert(document).values({
-//       id,
-//       title,
-//       kind,
-//       content,
-//       userId,
-//       createdAt: new Date(),
-//     });
-//   } catch (error) {
-//     console.error('Failed to save document in database');
-//     throw error;
-//   }
-// }
+export async function saveDocument({
+  id,
+  title,
+  kind,
+  content,
+  userId,
+}: {
+  id: string;
+  title: string;
+  kind: ArtifactKind;
+  content: string;
+  userId: string;
+}) {
+  try {
+    return await db.insert(document).values({
+      id,
+      title,
+      kind,
+      content,
+      userId,
+      createdAt: new Date(),
+    });
+  } catch (error) {
+    console.error('Failed to save document in database');
+    throw error;
+  }
+}
 
 export async function getDocumentsById({ id }: { id: string }) {
   try {

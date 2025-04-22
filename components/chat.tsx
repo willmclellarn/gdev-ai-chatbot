@@ -14,6 +14,7 @@ import { useArtifactSelector } from '@/hooks/use-artifact';
 import { toast } from 'sonner';
 import { unstable_serialize } from 'swr/infinite';
 import { getChatHistoryPaginationKey } from './sidebar-history';
+import { useGlobalState } from '@/hooks/use-global-state';
 
 export function Chat({
   id,
@@ -27,6 +28,7 @@ export function Chat({
   isReadonly: boolean;
 }) {
   const { mutate } = useSWRConfig();
+  const { state: { embeddingModel } } = useGlobalState();
 
   const {
     messages,
@@ -40,7 +42,7 @@ export function Chat({
     reload,
   } = useChat({
     id,
-    body: { id, selectedChatModel: selectedChatModel },
+    body: { id, selectedChatModel: selectedChatModel, embeddingModel: embeddingModel.id },
     initialMessages,
     experimental_throttle: 100,
     sendExtraMessageFields: true,

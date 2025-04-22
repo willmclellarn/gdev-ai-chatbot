@@ -25,6 +25,7 @@ import { requestSuggestions } from '@/lib/ai/tools/request-suggestions';
 import { getWeather } from '@/lib/ai/tools/get-weather';
 import { isProductionEnvironment } from '@/lib/constants';
 import { myProvider } from '@/lib/ai/providers';
+import { performRAGSearch } from '@/lib/utils/rag';
 
 export const maxDuration = 60;
 
@@ -35,10 +36,12 @@ export async function POST(request: Request) {
       id,
       messages,
       selectedChatModel,
+      embeddingModel,
     }: {
       id: string;
       messages: Array<UIMessage>;
       selectedChatModel: string;
+      embeddingModel: string;
     } = await request.json();
 
     console.log(`🔵 [Chat API] Processing chat with ID: ${id}, model: ${myProvider.languageModel(selectedChatModel).modelId}`);
@@ -65,19 +68,19 @@ export async function POST(request: Request) {
         .map(part => part.text)
         .join(' ');
 
-      const searchResponse = await fetch(`/api/rag/search`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          query: userMessageText,
-        }),
-      });
+      console.log('🔵 [Chat API] Performing vector search for query:', userMessageText);
 
-      if (searchResponse.ok) {
-        const { context: searchContext } = await searchResponse.json();
+      const searchResponse = await performRAGSearch(userMessageText, embeddingModel);
+
+      console.log('🔵 [Chat API] Vector search response:', searchResponse);
+
+      const { context: searchContext, matches } = searchResponse;
+
+      if (searchContext) {
+        console.log('🔵 [Chat API] Found relevant context with', matches?.length || 0, 'matches');
         context = searchContext;
+      } else {
+        console.log('🔵 [Chat API] No relevant context found');
       }
     } catch (error) {
       console.error('🔵 [Chat API] Error performing vector search:', error);
@@ -117,8 +120,6 @@ export async function POST(request: Request) {
 
     // log the context
     console.log('🔵 [Chat API] Context:', context);
-
-    context = 'This is a test context';
 
     // log the selectedChatModel
     console.log('🔵 [Chat API] Selected chat model:', selectedChatModel);
