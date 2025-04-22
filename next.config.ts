@@ -8,6 +8,10 @@ const nextConfig: NextConfig = {
     },
     serverComponentsExternalPackages: ["pdf-parse"],
   },
+  devIndicators: {
+    buildActivityPosition: "bottom-right",
+    buildActivity: false,
+  },
   images: {
     remotePatterns: [
       {

@@ -20,7 +20,11 @@ export async function createRagFormData({
   const formData = new FormData();
 
   if (file) {
-    const blob = new Blob([Buffer.from(file.base64File, 'base64')], { type: 'application/octet-stream' });
+    // Get the file extension from the base64 file name or metadata
+    const fileExtension = file.metadata?.[0]?.styles?.fontFamily || 'txt';
+    const mimeType = getMimeTypeFromExtension(fileExtension);
+
+    const blob = new Blob([Buffer.from(file.base64File, 'base64')], { type: mimeType });
     formData.append('file', blob);
   } else if (selectedLocalFile) {
     const response = await fetch(selectedLocalFile);
@@ -43,4 +47,17 @@ export async function createRagFormData({
   }
 
   return formData;
+}
+
+function getMimeTypeFromExtension(extension: string): string {
+  const mimeTypes: Record<string, string> = {
+    'pdf': 'application/pdf',
+    'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'doc': 'application/msword',
+    'txt': 'text/plain',
+    'md': 'text/markdown',
+    'html': 'text/html',
+  };
+
+  return mimeTypes[extension.toLowerCase()] || 'text/plain';
 }

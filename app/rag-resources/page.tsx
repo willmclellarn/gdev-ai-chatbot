@@ -32,7 +32,7 @@ export default function RAGResourcesPage() {
   const [chunkSize, setChunkSize] = useState(1000);
   const [chunkOverlap, setChunkOverlap] = useState(200);
   const [isUploading, setIsUploading] = useState(false);
-  const [chunkingStrategy, setChunkingStrategy] = useState<ChunkingStrategy>('html');
+  const [chunkingStrategy, setChunkingStrategy] = useState<ChunkingStrategy>('token');
   const [previewText, setPreviewText] = useState('');
   const [previewFormat, setPreviewFormat] = useState<'plain' | 'html' | 'markdown'>('plain');
   const [previewMetadata, setPreviewMetadata] = useState<ProcessedDocument['metadata']>([]);

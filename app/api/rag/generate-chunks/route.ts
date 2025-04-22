@@ -12,6 +12,15 @@ export async function POST(req: NextRequest) {
     const keywords = formData.get('keywords') as string;
     const limit = Number.parseInt(formData.get('limit') as string);
 
+    // log the chunking details
+    console.log('Chunking details:', {
+      chunkingStrategy,
+      chunkSize,
+      chunkOverlap,
+      keywords,
+      limit
+    });
+
     if (!file) {
       return NextResponse.json(
         { error: 'No file provided' },

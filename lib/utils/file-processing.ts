@@ -51,9 +51,19 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
  */
 export async function extractTextFromFile(file: File): Promise<ProcessedDocument> {
   const fileType = file.type;
+  console.log('🔵 File processing details:', {
+    fileName: file.name,
+    fileType,
+    fileSize: file.size
+  });
+
   let text = '';
   let format: 'plain' | 'html' | 'markdown' = 'plain';
-  let metadata: ProcessedDocument['metadata'] = [];
+  let metadata: ProcessedDocument['metadata'] = [{
+    styles: {
+      fontFamily: file.name.split('.').pop()?.toLowerCase() || 'txt'
+    }
+  }];
 
   // Read file as ArrayBuffer for both pdfParse and Mammoth
   const arrayBuffer = await file.arrayBuffer();
