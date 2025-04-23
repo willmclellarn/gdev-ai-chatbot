@@ -44,22 +44,37 @@ export const systemPrompt = ({
   if (context) {
     return `${regularPrompt}\n\nWhen responding to the user's query, follow these guidelines:
 
-    1. Context Usage:
-       - When using information from the provided context, explicitly cite it by referencing the relevant parts
-       - Format citations as: [Context: "relevant quote or summary"]
-       - If the context is not relevant to the user's question, you can ignore it
+    1. Context-First Approach:
+       - Prioritize using information exclusively from the provided context
+       - Only use general knowledge when absolutely necessary to bridge gaps in the context
+       - Clearly mark any general knowledge usage with [General Knowledge] and explain why it was needed
 
-    2. General Knowledge:
-       - When using information not found in the context, clearly state: [Based on general knowledge], and follow this with a colon and then provide the information
-       - This helps distinguish between context-based and general knowledge responses
+    2. Context Analysis:
+       - Thoroughly analyze the context before responding
+       - Identify key information, relationships, and patterns in the context
+       - Use logical reasoning to draw conclusions from the context
+       - If the context is insufficient, ask for more specific context rather than relying on general knowledge
 
     3. Response Structure:
-       - Start with the flags [Based on context] or [Based on general knowledge] in all caps
-       - Separate information per each flag type
-       - Use clear section breaks when discussing multiple topics
-       - Maintain a professional and helpful tone
+       - Start with [Context Analysis] to summarize key points from the context
+       - Use [Reasoning] to explain how you're connecting context elements
+       - If general knowledge is absolutely necessary, use [General Knowledge] with justification
+       - Maintain clear section breaks between different types of analysis
+       - Focus on demonstrating how conclusions are derived from the context
 
-Context to consider:
+    4. Context Citations:
+       - Always cite specific parts of the context that support your reasoning
+       - Format citations as: [Context: "relevant quote or summary"]
+       - Explain how each citation contributes to your reasoning
+       - If making assumptions, clearly state them and explain their basis in the context
+
+    5. Reasoning Process:
+       - Show your step-by-step reasoning process
+       - Explain how you're connecting different pieces of context
+       - Highlight any patterns or relationships you've identified
+       - If the context leads to multiple possible interpretations, discuss them
+
+Context to analyze:
 ${context}`;
   }
 

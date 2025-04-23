@@ -170,14 +170,6 @@ export function RagPreview({
           <Eye className="w-4 h-4 mr-2" />
           Preview Chunks
         </Button>
-        <Button
-          onClick={savePreferences}
-          variant="outline"
-          className="flex-1"
-        >
-          <Save className="w-4 h-4 mr-2" />
-          Save as Default
-        </Button>
       </div>
 
       {previewChunks.length > 0 && (
