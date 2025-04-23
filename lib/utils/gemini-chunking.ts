@@ -5,16 +5,22 @@ import { z } from "zod";
 import fs from "fs";
 
 function createChunkingPrompt(documentText: string) {
-  return `You are a helpful assistant that splits a document into sections. Implement the sections by logic, by section or concept. We don't need necessarily small, but small is good, but really want them grouped by concept. For most, sections should be wrappers around a single concept. Length being moderate to small is better but not necessary. Focus on the logical wrapping.
+  return `
+  - You are a helpful assistant that splits a document into logically grouped sections.
+  - Implement the sections by logic, or concept.
+  - Moderate size (500 words) is good, but REALLY want them grouped by concept.
+  - Focus on the logical wrapping.
 
-## Start content for each section
-Mark each section with the start content (a couple of sentences) and only return that. Don't exclude any content from the start content. DO NOT  REMOVE ANY CONTENT FROM THE START CONTENT.
+  ## Start content for each section
+  - Mark each section with the start content (the first couple of sentences' exact content) and only return that.
+  - Don't exclude any content from the start content.
+  - DO NOT REMOVE ANY CONTENT FROM THE START CONTENT.
 
-Here is the document content:
-<document>
-${documentText}
-</document>
-`;
+  Here is the document content
+  <document>
+  ${documentText}
+  </document>
+  `;
 }
 
 export async function splitByGeminiGenius(
