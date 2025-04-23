@@ -18,8 +18,6 @@ export interface ChunkingOptions {
   strategy: ChunkingStrategy;
   chunkSize: number; // For token-based chunking fallback
   chunkOverlap: number; // For token-based chunking fallback
-  format: "plain" | "html" | "markdown";
-  fileExtension: string; // The actual file extension (e.g. 'html', 'md', 'txt')
   keywords?: string[]; // Optional keywords for keyword-based chunking
   metadata?: ProcessedDocument["metadata"]; // Optional metadata for preserving formatting
 }
@@ -244,22 +242,16 @@ export async function splitTextIntoChunks(
   strategy: ChunkingStrategy;
   exceededChunkSize?: boolean;
 }> {
-  const { strategy, chunkSize, chunkOverlap, format, fileExtension, keywords } =
-    options;
+  const { strategy, chunkSize, chunkOverlap, keywords } = options;
 
   console.log("🔵 [Chunking] Starting text chunking with options:", {
     requestedStrategy: strategy,
-    fileExtension,
-    format,
     hasKeywords: !!keywords?.length,
     chunkSize,
   });
 
   // If strategy is 'auto', determine the best strategy based on file extension
-  const effectiveStrategy =
-    strategy === "auto"
-      ? await determineBestStrategy(fileExtension, text)
-      : strategy;
+  const effectiveStrategy = strategy === "auto" ? "gemini-genius" : strategy;
 
   console.log("🔵 [Chunking] Selected strategy:", effectiveStrategy);
 
@@ -269,8 +261,7 @@ export async function splitTextIntoChunks(
   switch (effectiveStrategy) {
     case "headers":
       console.log("🔵 [Chunking] Using header-based chunking");
-      chunks =
-        format === "html" ? splitByHtmlHeaders(text) : splitByHeaders(text);
+      chunks = splitByHeaders(text);
       break;
 
     case "centered":

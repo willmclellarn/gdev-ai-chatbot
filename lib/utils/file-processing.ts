@@ -1,20 +1,20 @@
-'use server';
+"use server";
 
-import mammoth from 'mammoth';
-import { ChunkingStrategy, splitTextIntoChunks } from './chunking';
+import mammoth from "mammoth";
+import { ChunkingStrategy, splitTextIntoChunks } from "./chunking";
 
 /**
  * Represents a processed document with its extracted content and metadata.
  */
 export interface ProcessedDocument {
-  text: string;           // The extracted text content
-  format: 'plain' | 'html' | 'markdown';
+  text: string; // The extracted text content
+  format: "plain" | "html" | "markdown";
   metadata?: {
     styles?: {
       bold?: boolean;
       italic?: boolean;
       underline?: boolean;
-      alignment?: 'left' | 'center' | 'right' | 'justify';
+      alignment?: "left" | "center" | "right" | "justify";
       fontSize?: number;
       fontFamily?: string;
     };
@@ -29,11 +29,18 @@ export interface ProcessedDocument {
   base64File: string;
 }
 
+interface ChunkingOptions {
+  strategy: ChunkingStrategy;
+  chunkSize: number;
+  chunkOverlap: number;
+  keywords?: string;
+}
+
 /**
  * Encodes an ArrayBuffer into a base64 string.
  */
 function arrayBufferToBase64(buffer: ArrayBuffer): string {
-  let binary = '';
+  let binary = "";
   const bytes = new Uint8Array(buffer);
   const len = bytes.byteLength;
   for (let i = 0; i < len; i++) {
@@ -49,21 +56,26 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
  *
  * Returns the extracted text, format, metadata, and a base64 representation of the original file.
  */
-export async function extractTextFromFile(file: File, options?: { makePlainText?: boolean }): Promise<ProcessedDocument> {
+export async function extractFormattedTextFromFile(
+  file: File,
+  options?: { makePlainText?: boolean }
+): Promise<ProcessedDocument> {
   const fileType = file.type;
-  console.log('🔵 File processing details:', {
+  console.log("🔵 File processing details:", {
     fileName: file.name,
     fileType,
-    fileSize: file.size
+    fileSize: file.size,
   });
 
-  let text = '';
-  let format: 'plain' | 'html' | 'markdown' = 'plain';
-  let metadata: ProcessedDocument['metadata'] = [{
-    styles: {
-      fontFamily: file.name.split('.').pop()?.toLowerCase() || 'txt'
-    }
-  }];
+  let text = "";
+  let format: "plain" | "html" | "markdown" = "plain";
+  let metadata: ProcessedDocument["metadata"] = [
+    {
+      styles: {
+        fontFamily: file.name.split(".").pop()?.toLowerCase() || "txt",
+      },
+    },
+  ];
 
   // Read file as ArrayBuffer for both pdfParse and Mammoth
   const arrayBuffer = await file.arrayBuffer();
@@ -73,8 +85,9 @@ export async function extractTextFromFile(file: File, options?: { makePlainText?
   try {
     // Handle Microsoft Word documents
     if (
-      fileType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
-      fileType === 'application/msword'
+      fileType ===
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+      fileType === "application/msword"
     ) {
       // First embed the style map (no synthetic alignment rules)
       const styleMap = [
@@ -104,7 +117,7 @@ export async function extractTextFromFile(file: File, options?: { makePlainText?
         "r[style-name='strikethrough'] => del:fresh",
         "r[style-name='superscript'] => sup:fresh",
         "r[style-name='subscript'] => sub:fresh",
-      ].join('\n');
+      ].join("\n");
 
       // Convert to HTML without transforms
       const result = await mammoth.convertToHtml(
@@ -113,26 +126,28 @@ export async function extractTextFromFile(file: File, options?: { makePlainText?
       );
 
       text = result.value;
-      format = 'html';
+      format = "html";
 
-      console.log('🔵 HTML result:', text);
+      console.log("🔵 HTML result:", text);
 
       // Enhanced metadata extraction for Google Docs
       if (result.messages) {
         result.messages.forEach((message: any) => {
-          if (message.type === 'style') {
-            const isTitle = message.style?.styleName?.toLowerCase().includes('title') ||
-                           message.style?.styleName?.toLowerCase().includes('heading');
+          if (message.type === "style") {
+            const isTitle =
+              message.style?.styleName?.toLowerCase().includes("title") ||
+              message.style?.styleName?.toLowerCase().includes("heading");
 
             metadata.push({
               styles: {
                 bold: !!message.style?.bold || isTitle,
                 italic: !!message.style?.italic,
                 underline: !!message.style?.underline,
-                alignment: message.style?.alignment || (isTitle ? 'center' : undefined),
+                alignment:
+                  message.style?.alignment || (isTitle ? "center" : undefined),
                 fontSize: message.style?.fontSize || (isTitle ? 24 : undefined),
                 fontFamily: message.style?.fontFamily,
-              }
+              },
             });
           }
         });
@@ -140,64 +155,73 @@ export async function extractTextFromFile(file: File, options?: { makePlainText?
     }
 
     // Handle plain text files
-    else if (fileType === 'text/plain') {
+    else if (fileType === "text/plain") {
       text = await file.text();
-      format = 'plain';
+      format = "plain";
     }
 
     // Handle markdown files
-    else if (fileType === 'text/markdown') {
+    else if (fileType === "text/markdown") {
       text = await file.text();
-      format = 'markdown';
-    }
-
-    else {
-      throw new Error('Unsupported file type');
-    }
-
-    if (options?.makePlainText) {
-      text = await makePlainText(text);
+      format = "markdown";
+    } else {
+      throw new Error("Unsupported file type");
     }
 
     return {
       text,
       format,
       metadata,
-      base64File
+      base64File,
     };
   } catch (error) {
-    console.error('🔵 Error extracting text from file:', error);
+    console.error("🔵 Error extracting text from file:", error);
     throw error;
   }
 }
 
-function makePlainText(text: string): string {
-  // remove all HTML formatting
-  return text.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ');
-}
+export async function extractPlainTextFromFile(file: File): Promise<string> {
+  console.log("🔵 Extracting plain text from file:", file.name, file.type);
 
-interface ChunkingOptions {
-  strategy: ChunkingStrategy;
-  chunkSize: number;
-  chunkOverlap: number;
-  keywords?: string;
-}
+  try {
+    // Handle Microsoft Word documents
+    if (
+      file.type ===
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+      file.type === "application/msword"
+    ) {
+      const arrayBuffer = await file.arrayBuffer();
+      const result = await mammoth.extractRawText({
+        buffer: Buffer.from(arrayBuffer),
+      });
+      return result.value;
+    }
 
-export async function processFileWithChunking(
-  file: File,
-  options: ChunkingOptions
-): Promise<string[]> {
-  const text = await file.text();
-  const fileExtension = file.name.split('.').pop()?.toLowerCase() || 'txt';
+    // Handle plain text files
+    if (file.type === "text/plain" || file.type === "text/markdown") {
+      return await file.text();
+    }
 
-  const { chunks } = await splitTextIntoChunks(text, {
-    strategy: options.strategy,
-    chunkSize: options.chunkSize,
-    chunkOverlap: options.chunkOverlap,
-    format: 'plain',
-    fileExtension,
-    keywords: options.keywords ? options.keywords.split(',').map(k => k.trim()) : undefined,
-  });
+    // For unsupported types, try to get text content if possible
+    try {
+      const text = await file.text();
+      // Basic check if the content looks like binary/gibberish
+      const sampleLength = Math.min(100, text.length);
+      const sample = text.slice(0, sampleLength);
+      const nonPrintableCount = (sample.match(/[^\x20-\x7E]/g) || []).length;
 
-  return chunks;
+      if (nonPrintableCount / sampleLength > 0.1) {
+        throw new Error("Content appears to be binary or non-text");
+      }
+
+      return text;
+    } catch (e) {
+      throw new Error(
+        `Unable to extract plain text from file type: ${file.type}`
+      );
+    }
+  } catch (error) {
+    console.error("🔵 Error extracting plain text:", error);
+    throw error;
+  }
 }

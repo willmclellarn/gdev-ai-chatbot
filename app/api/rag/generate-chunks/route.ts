@@ -1,56 +1,48 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { splitTextIntoChunks, ChunkingStrategy } from '@/lib/utils/chunking';
-import { extractTextFromFile } from '@/lib/utils/file-processing';
+import { NextRequest, NextResponse } from "next/server";
+import { splitTextIntoChunks, ChunkingStrategy } from "@/lib/utils/chunking";
 
 export async function POST(req: NextRequest) {
   try {
-    const formData = await req.formData();
-    const file = formData.get('file') as File;
-    const chunkingStrategy = formData.get('chunkingStrategy') as ChunkingStrategy;
-    const chunkSize = Number.parseInt(formData.get('chunkSize') as string);
-    const chunkOverlap = Number.parseInt(formData.get('chunkOverlap') as string);
-    const keywords = formData.get('keywords') as string;
-    const limit = Number.parseInt(formData.get('limit') as string);
+    const { text, chunkingStrategy, chunkSize, chunkOverlap, keywords } =
+      await req.json();
 
     // log the chunking details
-    console.log('Chunking details:', {
+    console.log("Chunking details:", {
+      text,
       chunkingStrategy,
       chunkSize,
       chunkOverlap,
       keywords,
-      limit
     });
 
-    if (!file) {
-      return NextResponse.json(
-        { error: 'No file provided' },
-        { status: 400 }
-      );
+    if (!text) {
+      return NextResponse.json({ error: "No text provided" }, { status: 400 });
     }
 
-    const processedDoc = await extractTextFromFile(file);
-
-    const result = await splitTextIntoChunks(processedDoc.text, {
+    const result = await splitTextIntoChunks(text, {
       strategy: chunkingStrategy,
       chunkSize: chunkSize || 1000,
       chunkOverlap: chunkOverlap || 200,
-      format: processedDoc.format,
-      fileExtension: file.name.split('.').pop()?.toLowerCase() || '',
-      keywords: keywords ? keywords.split(',').map(k => k.trim()).filter(k => k.length > 0) : [],
-      metadata: processedDoc.metadata,
+      keywords: keywords
+        ? keywords
+            .split(",")
+            .map((k: string) => k.trim())
+            .filter((k: string) => k.length > 0)
+        : [],
+      metadata: [],
     });
 
-    const previewText = result.chunks.slice(0, limit).join('\n\n');
+    const previewText = result.chunks.slice(0, 5).join("\n\n");
 
     return NextResponse.json({
       chunks: result.chunks,
       previewText,
-      strategy: result.strategy
+      strategy: result.strategy,
     });
   } catch (error) {
-    console.error('🔵 Error splitting text:', error);
+    console.error("🔵 Error splitting text:", error);
     return NextResponse.json(
-      { error: 'Error splitting text' },
+      { error: "Error splitting text" },
       { status: 500 }
     );
   }

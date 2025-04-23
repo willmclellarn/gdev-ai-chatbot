@@ -1,32 +1,28 @@
-'use client';
+"use client";
 
-import { Label } from '@/components/ui/label';
+import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { ChunkingStrategy } from '@/lib/utils/chunking';
-import { Markdown } from '@/components/markdown';
-import { cn } from '@/lib/utils';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { ProcessedDocument } from '@/lib/utils/file-processing';
-import { useEffect, useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Maximize2, Minimize2 } from 'lucide-react';
+import { ChunkingStrategy } from "@/lib/utils/chunking";
+import { Markdown } from "@/components/markdown";
+import { cn } from "@/lib/utils";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { ProcessedDocument } from "@/lib/utils/file-processing";
+import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Maximize2, Minimize2 } from "lucide-react";
 
 interface RagDocumentPreviewProps {
   previewText: string;
   onPreviewTextChange: (text: string) => void;
   selectedLocalFile: string;
-  chunkingStrategy: ChunkingStrategy;
-  format?: 'plain' | 'html' | 'markdown';
-  metadata?: ProcessedDocument['metadata'];
+  format?: "plain" | "html" | "markdown";
 }
 
 export function RagDocumentPreview({
   previewText,
   onPreviewTextChange,
   selectedLocalFile,
-  chunkingStrategy,
-  format = 'plain',
-  metadata = [],
+  format = "plain",
 }: RagDocumentPreviewProps) {
   const [preview, setPreview] = useState(previewText);
   const [isFullScreen, setIsFullScreen] = useState(false);
@@ -42,10 +38,14 @@ export function RagDocumentPreview({
   };
 
   return (
-    <div className={cn(
-      "space-y-2",
-      isFullScreen ? "fixed top-0 right-0 bottom-0 w-[calc(100%-16rem)] z-50 bg-background p-4 border-l" : ""
-    )}>
+    <div
+      className={cn(
+        "space-y-2",
+        isFullScreen
+          ? "fixed top-0 right-0 bottom-0 w-[calc(100%-16rem)] z-50 bg-background p-4 border-l"
+          : ""
+      )}
+    >
       <div className="space-y-2">
         <Label>Document Preview</Label>
         <Button
@@ -67,30 +67,27 @@ export function RagDocumentPreview({
           )}
         </Button>
       </div>
-      <div className="flex items-center justify-between">
-        <span className="text-sm text-muted-foreground">
-          {chunkingStrategy === 'auto'
-            ? 'Strategy will be auto-selected based on content'
-            : `Using strategy: ${chunkingStrategy}`}
-        </span>
-      </div>
       <div className="relative">
         {selectedLocalFile ? (
-          <ScrollArea className={cn(
-            "border rounded-md",
-            isFullScreen ? "h-[calc(100vh-8rem)]" : "h-[400px]"
-          )}>
-            <div className={cn(
-              "p-4 prose dark:prose-invert max-w-none",
-              "bg-background",
-              {
-                'whitespace-pre-wrap': format === 'plain',
-                'prose-pre:whitespace-pre-wrap': format === 'plain',
-              }
-            )}>
-              {format === 'markdown' ? (
+          <ScrollArea
+            className={cn(
+              "border rounded-md",
+              isFullScreen ? "h-[calc(100vh-8rem)]" : "h-[400px]"
+            )}
+          >
+            <div
+              className={cn(
+                "p-4 prose dark:prose-invert max-w-none",
+                "bg-background",
+                {
+                  "whitespace-pre-wrap": format === "plain",
+                  "prose-pre:whitespace-pre-wrap": format === "plain",
+                }
+              )}
+            >
+              {format === "markdown" ? (
                 <Markdown>{previewText}</Markdown>
-              ) : format === 'html' ? (
+              ) : format === "html" ? (
                 <div
                   className="prose dark:prose-invert max-w-none [&_p]:my-2 [&_p[style*='text-align:center']]:text-center [&_p[style*='text-align:right']]:text-right [&_p[style*='text-align:justify']]:text-justify"
                   dangerouslySetInnerHTML={{ __html: previewText }}

@@ -1,24 +1,32 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from "react";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from '@/components/ui/card';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { AlertCircle, Bell } from 'lucide-react';
-import { RAGHeader } from '@/components/rag/rag-header';
-import { useAdmin } from '@/hooks/use-admin';
-import { RagFileSelection } from '@/components/rag/rag-file-selection';
-import { RagChunkingConfig } from '@/components/rag/rag-chunking-config';
-import { RagPreview } from '@/components/rag/rag-preview';
-import { RagUpload } from '@/components/rag/rag-upload';
-import { ChunkingStrategy } from '@/lib/utils/chunking';
-import { ProcessedDocument } from '@/lib/utils/file-processing';
-import { useGlobalState } from '@/hooks/use-global-state';
+} from "@/components/ui/card";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { AlertCircle, Bell, Eye } from "lucide-react";
+import { RAGHeader } from "@/components/rag/rag-header";
+import { useAdmin } from "@/hooks/use-admin";
+import { RagFileSelection } from "@/components/rag/rag-file-selection";
+import { RagChunkingConfig } from "@/components/rag/rag-chunking-config";
+import { RagDocumentPreview } from "@/components/rag/rag-document-preview";
+import { RagChunkPreview } from "@/components/rag/rag-chunk-preview";
+import { Button } from "@/components/ui/button";
+import { RagUpload } from "@/components/rag/rag-upload";
+import { ChunkingStrategy } from "@/lib/utils/chunking";
+import {
+  extractPlainTextFromFile,
+  ProcessedDocument,
+} from "@/lib/utils/file-processing";
+import { useGlobalState } from "@/hooks/use-global-state";
+import { useSession } from "next-auth/react";
+import { toast } from "sonner";
+import { createRagFormData } from "@/lib/utils/form-data";
 
 interface AssetFile {
   name: string;
@@ -27,31 +35,42 @@ interface AssetFile {
 
 export default function RAGResourcesPage() {
   const [file, setFile] = useState<File | null>(null);
-  const [selectedLocalFile, setSelectedLocalFile] = useState<string>('');
+  const [selectedLocalFile, setSelectedLocalFile] = useState<string>("");
   const [localFiles, setLocalFiles] = useState<AssetFile[]>([]);
   const [isLoadingFiles, setIsLoadingFiles] = useState(true);
   const [chunkSize, setChunkSize] = useState(500);
   const [chunkOverlap, setChunkOverlap] = useState(200);
   const [isUploading, setIsUploading] = useState(false);
-  const [chunkingStrategy, setChunkingStrategy] = useState<ChunkingStrategy>('token');
-  const [previewText, setPreviewText] = useState('');
-  const [previewFormat, setPreviewFormat] = useState<'plain' | 'html' | 'markdown'>('plain');
-  const [previewMetadata, setPreviewMetadata] = useState<ProcessedDocument['metadata']>([]);
+  const [chunkingStrategy, setChunkingStrategy] =
+    useState<ChunkingStrategy>("token");
+  const [previewText, setPreviewText] = useState("");
+  const [previewFormat, setPreviewFormat] = useState<
+    "plain" | "html" | "markdown"
+  >("plain");
+  const [previewMetadata, setPreviewMetadata] = useState<
+    ProcessedDocument["metadata"]
+  >([]);
   const [previewChunks, setPreviewChunks] = useState<string[]>([]);
-  const [keywords, setKeywords] = useState<string>('');
+  const [keywords, setKeywords] = useState<string>("");
   const [hasChunkingChanges, setHasChunkingChanges] = useState(false);
   const { isAdmin, isLoading } = useAdmin();
-  const { state: { embeddingModel } } = useGlobalState();
+  const {
+    state: { embeddingModel },
+  } = useGlobalState();
+  const [actualStrategy, setActualStrategy] = useState<ChunkingStrategy | null>(
+    null
+  );
+  const { data: session } = useSession();
 
   useEffect(() => {
     const fetchLocalFiles = async () => {
       try {
-        const response = await fetch('/api/rag/list-assets');
-        if (!response.ok) throw new Error('Failed to fetch files');
+        const response = await fetch("/api/rag/list-assets");
+        if (!response.ok) throw new Error("Failed to fetch files");
         const files = await response.json();
         setLocalFiles(files);
       } catch (error) {
-        console.error('Error fetching local files:', error);
+        console.error("Error fetching local files:", error);
       } finally {
         setIsLoadingFiles(false);
       }
@@ -64,15 +83,15 @@ export default function RAGResourcesPage() {
     const defaultSettings = {
       chunkSize: 1000,
       chunkOverlap: 200,
-      chunkingStrategy: 'token' as ChunkingStrategy,
-      keywords: ''
+      chunkingStrategy: "token" as ChunkingStrategy,
+      keywords: "",
     };
 
     const currentSettings = {
       chunkSize,
       chunkOverlap,
       chunkingStrategy,
-      keywords
+      keywords,
     };
 
     setHasChunkingChanges(
@@ -81,8 +100,8 @@ export default function RAGResourcesPage() {
   }, [chunkSize, chunkOverlap, chunkingStrategy, keywords]);
 
   const handleSaveDefault = async () => {
-    const response = await fetch('/api/rag/preferences', {
-      method: 'POST',
+    const response = await fetch("/api/rag/preferences", {
+      method: "POST",
       body: JSON.stringify({
         chunkingStrategy,
         chunkSize,
@@ -91,7 +110,7 @@ export default function RAGResourcesPage() {
     });
 
     if (!response.ok) {
-      console.error('Failed to save default settings');
+      console.error("Failed to save default settings");
     }
 
     setHasChunkingChanges(false);
@@ -100,40 +119,43 @@ export default function RAGResourcesPage() {
   const handleLocalFileSelect = async (path: string) => {
     try {
       const response = await fetch(path);
-      if (!response.ok) throw new Error('Failed to fetch file');
+      if (!response.ok) throw new Error("Failed to fetch file");
 
       const blob = await response.blob();
-      const file = new File([blob], path.split('/').pop() || 'document', {
-        type: path.toLowerCase().endsWith('.docx')
-          ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-          : blob.type
+      const file = new File([blob], path.split("/").pop() || "document", {
+        type: path.toLowerCase().endsWith(".docx")
+          ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+          : blob.type,
       });
 
       const formData = new FormData();
-      formData.append('file', file);
+      formData.append("file", file);
 
       let processedDoc: ProcessedDocument;
 
-      if (file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+      if (
+        file.type ===
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+      ) {
         processedDoc = await fetch("/api/process-file/word", {
-          method: 'POST',
+          method: "POST",
           body: formData,
-        }).then(res => res.json());
-      } else if (file.type === 'application/pdf') {
+        }).then((res) => res.json());
+      } else if (file.type === "application/pdf") {
         processedDoc = await fetch("/api/process-file/pdf", {
-          method: 'POST',
+          method: "POST",
           body: formData,
-        }).then(res => res.json());
-      } else if (file.name.toLowerCase().endsWith('.md')) {
+        }).then((res) => res.json());
+      } else if (file.name.toLowerCase().endsWith(".md")) {
         processedDoc = await fetch("/api/process-file/markdown", {
-          method: 'POST',
+          method: "POST",
           body: formData,
-        }).then(res => res.json());
+        }).then((res) => res.json());
       } else {
         processedDoc = await fetch("/api/process-file/generic", {
-          method: 'POST',
+          method: "POST",
           body: formData,
-        }).then(res => res.json());
+        }).then((res) => res.json());
       }
 
       setFile(file);
@@ -142,13 +164,18 @@ export default function RAGResourcesPage() {
       setPreviewFormat(processedDoc.format);
       setPreviewMetadata(processedDoc.metadata || []);
     } catch (error) {
-      console.error('🟡 Error processing file:', error);
+      console.error("🟡 Error processing file:", error);
     }
   };
 
-  const handleFileSelect = (selectedFile: File, text: string, format: 'plain' | 'html' | 'markdown', metadata?: ProcessedDocument['metadata']) => {
+  const handleFileSelect = (
+    selectedFile: File,
+    text: string,
+    format: "plain" | "html" | "markdown",
+    metadata?: ProcessedDocument["metadata"]
+  ) => {
     setFile(selectedFile);
-    setSelectedLocalFile('');
+    setSelectedLocalFile("");
     setPreviewText(text);
     setPreviewFormat(format);
     setPreviewMetadata(metadata || []);
@@ -157,6 +184,55 @@ export default function RAGResourcesPage() {
   const handleUploadComplete = () => {
     setFile(null);
     setIsUploading(false);
+  };
+
+  const handlePreviewChunks = async () => {
+    try {
+      if (!file) {
+        toast.error("No file provided");
+        setPreviewChunks([]);
+        return;
+      }
+
+      const textFromFile = await extractPlainTextFromFile(file);
+
+      // const formData = await createRagFormData({
+      //   file: textFromFile,
+      //   selectedLocalFile,
+      //   chunkingStrategy,
+      //   chunkSize,
+      //   chunkOverlap,
+      //   keywords,
+      // });
+
+      const result = await fetch("/api/rag/generate-chunks", {
+        method: "POST",
+        body: JSON.stringify({
+          text: textFromFile,
+          chunkingStrategy,
+          chunkSize,
+          chunkOverlap,
+          keywords,
+        }),
+      });
+
+      if (!result.ok) {
+        const errorText = await result.text();
+        console.error("🔵 Rag Preview API error:", errorText);
+        setPreviewChunks([]);
+        return;
+      }
+
+      const data = await result.json();
+      // setPreviewText(data.previewText);
+      setPreviewChunks(data.chunks || []);
+      if (chunkingStrategy === "auto") {
+        setActualStrategy(data.strategy);
+      }
+    } catch (error) {
+      console.error("🔴 Rag Preview generatePreview error:", error);
+      setPreviewChunks([]);
+    }
   };
 
   if (isLoading) {
@@ -201,8 +277,8 @@ export default function RAGResourcesPage() {
             <CardTitle>RAG Resources</CardTitle>
             <CardDescription>
               {isAdmin
-                ? 'Upload PDFs to be processed and stored in the vector database'
-                : 'View and manage RAG resources'}
+                ? "Upload PDFs to be processed and stored in the vector database"
+                : "View and manage RAG resources"}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -211,7 +287,8 @@ export default function RAGResourcesPage() {
                 <AlertCircle className="h-4 w-4" />
                 <AlertTitle>Access Denied</AlertTitle>
                 <AlertDescription>
-                  You do not have permission to upload documents. Please contact an administrator.
+                  You do not have permission to upload documents. Please contact
+                  an administrator.
                 </AlertDescription>
               </Alert>
             )}
@@ -238,20 +315,31 @@ export default function RAGResourcesPage() {
                   onKeywordsChange={setKeywords}
                 />
 
-                <RagPreview
+                <RagDocumentPreview
                   previewText={previewText}
                   onPreviewTextChange={setPreviewText}
-                  previewChunks={previewChunks}
-                  onPreviewChunksChange={setPreviewChunks}
                   selectedLocalFile={selectedLocalFile}
-                  chunkingStrategy={chunkingStrategy}
-                  chunkSize={chunkSize}
-                  chunkOverlap={chunkOverlap}
-                  keywords={keywords}
                   format={previewFormat}
-                  metadata={previewMetadata}
-                  file={file}
                 />
+
+                <div className="flex gap-2">
+                  <Button
+                    onClick={handlePreviewChunks}
+                    variant="outline"
+                    className="flex-1"
+                  >
+                    <Eye className="w-4 h-4 mr-2" />
+                    Preview Chunks
+                  </Button>
+                </div>
+
+                {previewChunks.length > 0 && (
+                  <RagChunkPreview
+                    previewChunks={previewChunks}
+                    chunkingStrategy={chunkingStrategy}
+                    actualStrategy={actualStrategy}
+                  />
+                )}
 
                 <RagUpload
                   file={file}
