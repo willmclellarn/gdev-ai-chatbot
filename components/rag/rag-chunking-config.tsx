@@ -52,6 +52,7 @@ export function RagChunkingConfig({
               <SelectItem value="centered">Centered Content</SelectItem>
               <SelectItem value="html">HTML Structure</SelectItem>
               <SelectItem value="keyword">Keyword-based</SelectItem>
+              <SelectItem value="gemini-genius">Gemini Genius</SelectItem>
             </SelectContent>
           </Select>
           <p className="text-sm text-muted-foreground">
