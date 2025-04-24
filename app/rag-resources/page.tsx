@@ -38,6 +38,7 @@ export default function RAGResourcesPage() {
   const [selectedLocalFile, setSelectedLocalFile] = useState<string>("");
   const [localFiles, setLocalFiles] = useState<AssetFile[]>([]);
   const [isLoadingFiles, setIsLoadingFiles] = useState(true);
+  const [isPageLoading, setIsPageLoading] = useState(true);
   const [chunkSize, setChunkSize] = useState(500);
   const [chunkOverlap, setChunkOverlap] = useState(200);
   const [isUploading, setIsUploading] = useState(false);
@@ -73,6 +74,7 @@ export default function RAGResourcesPage() {
         console.error("Error fetching local files:", error);
       } finally {
         setIsLoadingFiles(false);
+        setIsPageLoading(false);
       }
     };
 
@@ -235,6 +237,22 @@ export default function RAGResourcesPage() {
     }
   };
 
+  if (isPageLoading) {
+    return (
+      <div className="flex flex-col h-full">
+        <RAGHeader />
+        <div className="container mx-auto py-8 flex-1">
+          <Card>
+            <CardHeader>
+              <CardTitle>RAG Resources</CardTitle>
+              <CardDescription>Loading...</CardDescription>
+            </CardHeader>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
   if (isLoading) {
     return (
       <div className="flex flex-col h-full">
@@ -260,100 +278,73 @@ export default function RAGResourcesPage() {
         hasChanges={hasChunkingChanges}
         onSaveDefault={handleSaveDefault}
       />
-      {isAdmin && (
-        <div className="container mx-auto px-4 py-2">
-          <Alert className="bg-yellow-50 border-yellow-200/50 text-yellow-800">
-            <Bell className="h-4 w-4 text-yellow-600" />
-            <AlertTitle>Admin Announcement</AlertTitle>
-            <AlertDescription className="text-yellow-700">
-              You have administrative access to manage RAG resources.
-            </AlertDescription>
-          </Alert>
-        </div>
-      )}
+
       <div className="container mx-auto px-4 py-8 flex-1">
         <Card>
           <CardHeader>
             <CardTitle>RAG Resources</CardTitle>
             <CardDescription>
-              {isAdmin
-                ? "Upload PDFs to be processed and stored in the vector database"
-                : "View and manage RAG resources"}
+              Upload PDFs to be processed and stored in the vector database
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            {!isAdmin && (
-              <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertTitle>Access Denied</AlertTitle>
-                <AlertDescription>
-                  You do not have permission to upload documents. Please contact
-                  an administrator.
-                </AlertDescription>
-              </Alert>
+            <RagFileSelection
+              onFileSelect={handleFileSelect}
+              onLocalFileSelect={handleLocalFileSelect}
+              isLoadingFiles={isLoadingFiles}
+              localFiles={localFiles}
+              selectedLocalFile={selectedLocalFile}
+              isUploading={isUploading}
+            />
+
+            <RagChunkingConfig
+              chunkingStrategy={chunkingStrategy}
+              onStrategyChange={setChunkingStrategy}
+              chunkSize={chunkSize}
+              onChunkSizeChange={setChunkSize}
+              chunkOverlap={chunkOverlap}
+              onChunkOverlapChange={setChunkOverlap}
+              keywords={keywords}
+              onKeywordsChange={setKeywords}
+            />
+
+            <RagDocumentPreview
+              previewText={previewText}
+              onPreviewTextChange={setPreviewText}
+              selectedLocalFile={selectedLocalFile}
+              format={previewFormat}
+            />
+
+            <div className="flex gap-2">
+              <Button
+                onClick={handlePreviewChunks}
+                variant="outline"
+                className="flex-1"
+              >
+                <Eye className="w-4 h-4 mr-2" />
+                Preview Chunks
+              </Button>
+            </div>
+
+            {previewChunks.length > 0 && (
+              <RagChunkPreview
+                previewChunks={previewChunks}
+                chunkingStrategy={chunkingStrategy}
+                actualStrategy={actualStrategy}
+              />
             )}
 
-            {isAdmin && (
-              <>
-                <RagFileSelection
-                  onFileSelect={handleFileSelect}
-                  onLocalFileSelect={handleLocalFileSelect}
-                  isLoadingFiles={isLoadingFiles}
-                  localFiles={localFiles}
-                  selectedLocalFile={selectedLocalFile}
-                  isUploading={isUploading}
-                />
-
-                <RagChunkingConfig
-                  chunkingStrategy={chunkingStrategy}
-                  onStrategyChange={setChunkingStrategy}
-                  chunkSize={chunkSize}
-                  onChunkSizeChange={setChunkSize}
-                  chunkOverlap={chunkOverlap}
-                  onChunkOverlapChange={setChunkOverlap}
-                  keywords={keywords}
-                  onKeywordsChange={setKeywords}
-                />
-
-                <RagDocumentPreview
-                  previewText={previewText}
-                  onPreviewTextChange={setPreviewText}
-                  selectedLocalFile={selectedLocalFile}
-                  format={previewFormat}
-                />
-
-                <div className="flex gap-2">
-                  <Button
-                    onClick={handlePreviewChunks}
-                    variant="outline"
-                    className="flex-1"
-                  >
-                    <Eye className="w-4 h-4 mr-2" />
-                    Preview Chunks
-                  </Button>
-                </div>
-
-                {previewChunks.length > 0 && (
-                  <RagChunkPreview
-                    previewChunks={previewChunks}
-                    chunkingStrategy={chunkingStrategy}
-                    actualStrategy={actualStrategy}
-                  />
-                )}
-
-                <RagUpload
-                  file={file}
-                  isUploading={isUploading}
-                  onUploadComplete={handleUploadComplete}
-                  chunkingStrategy={chunkingStrategy}
-                  chunkSize={chunkSize}
-                  chunkOverlap={chunkOverlap}
-                  keywords={keywords}
-                  embeddingModel={embeddingModel}
-                  selectedLocalFile={selectedLocalFile}
-                />
-              </>
-            )}
+            <RagUpload
+              file={file}
+              isUploading={isUploading}
+              onUploadComplete={handleUploadComplete}
+              chunkingStrategy={chunkingStrategy}
+              chunkSize={chunkSize}
+              chunkOverlap={chunkOverlap}
+              keywords={keywords}
+              embeddingModel={embeddingModel}
+              selectedLocalFile={selectedLocalFile}
+            />
           </CardContent>
         </Card>
       </div>

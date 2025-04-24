@@ -155,23 +155,21 @@ function PureRAGHeader({ hasChanges = false, onSaveDefault }: RAGHeaderProps) {
               <CheckCircleFillIcon />
             </div>
           </DropdownMenuItem>
-          {isAdmin && (
-            <DropdownMenuItem
-              onSelect={() => setResourceScope("admin")}
-              className="gap-4 group/item flex flex-row justify-between items-center"
-              data-active={resourceScope === "admin"}
-            >
-              <div className="flex flex-col gap-1 items-start">
-                <div>System-wide</div>
-                <div className="text-xs text-muted-foreground">
-                  Available to all users in the system
-                </div>
+          <DropdownMenuItem
+            onSelect={() => setResourceScope("admin")}
+            className="gap-4 group/item flex flex-row justify-between items-center"
+            data-active={resourceScope === "admin"}
+          >
+            <div className="flex flex-col gap-1 items-start">
+              <div>System-wide</div>
+              <div className="text-xs text-muted-foreground">
+                Available to all users in the system
               </div>
-              <div className="text-foreground dark:text-foreground opacity-0 group-data-[active=true]/item:opacity-100">
-                <CheckCircleFillIcon />
-              </div>
-            </DropdownMenuItem>
-          )}
+            </div>
+            <div className="text-foreground dark:text-foreground opacity-0 group-data-[active=true]/item:opacity-100">
+              <CheckCircleFillIcon />
+            </div>
+          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
 
