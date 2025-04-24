@@ -1,29 +1,29 @@
 ---
-description: 
-globs: 
+description:
+globs:
 alwaysApply: true
 ---
 # General Dev Codebase Rules
 
-1. **Use `pnpm` as the package manager.**  
+1. **Use `pnpm` as the package manager.**
    Always run installation and dependency commands with `pnpm` (e.g., `pnpm install` etc.).
 
-2. **Next.js fullstack with App Router.**  
+2. **Next.js fullstack with App Router.**
    This codebase is built on Next.js, leveraging the App Router (`app/` directory) for routing and server components.
 
-3. **Use `shadcn` for UI components wherever possible.**  
+3. **Use `shadcn` for UI components wherever possible.**
    Prefer Shadcn’s prebuilt or customized UI elements to maintain a consistent look and feel.
 
-4. **Loading states in UI.**  
+4. **Loading states in UI.**
    Ensure that every server or data-fetch action includes a visible loading state so users know an operation is in progress.
 
-5. **Display backend responses in the UI.**  
+5. **Display backend responses in the UI.**
    Expose server or API responses (success/error) in a clear way, aiding both debugging and user feedback.
 
-6. **Use Drizzle for DB operations, underlying, we have supabase’s local dev server for development, and its PostgreSQL DB in production.**  
+6. **Use Drizzle for DB operations, underlying, we have supabase’s local dev server for development, and its PostgreSQL DB in production.**
    For DB operations, use drizzle.
 
-7. **Use Pinecone for vector databases.**  
+7. **Use Pinecone for vector databases.**
    For vector-based tasks, use Pinecone. Maintain references between your main data store (Supabase) and Pinecone for efficient search and retrieval.
 
 8. **Logging guidelines**
@@ -33,7 +33,7 @@ alwaysApply: true
    Use Resend for email api needs
 
 10. **DB Migrations**
-   Use the pnpm run db:push in order to generate and run migrations after editing the Drizzle schema
+    - DO NOT use raw SQL files for DB changes, use the pnpm run db:push in order to generate and run migrations after editing the Drizzle schema
 
 11. **Page Size and Component Organization**
     - Keep page components under 200 lines of code
@@ -43,4 +43,4 @@ alwaysApply: true
     - Use clear, descriptive names for component files (e.g., `file-selection.tsx`, `chunking-config.tsx`)
     - Keep component props minimal and focused
     - Use TypeScript interfaces for component props
-    - Document complex component logic with comments 
+    - Document complex component logic with comments

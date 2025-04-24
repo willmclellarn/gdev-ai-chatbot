@@ -1,17 +1,26 @@
-'use client';
+"use client";
 
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { useWindowSize } from 'usehooks-ts';
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useWindowSize } from "usehooks-ts";
 
-import { ModelSelector } from '@/components/model-selector';
-import { SidebarToggle } from '@/components/sidebar-toggle';
-import { Button } from '@/components/ui/button';
-import { PlusIcon, VercelIcon } from './icons';
-import { useSidebar } from './ui/sidebar';
-import { memo } from 'react';
-import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
-import { Grid } from 'lucide-react';
+import { ModelSelector } from "@/components/model-selector";
+import { SidebarToggle } from "@/components/sidebar-toggle";
+import { Button } from "@/components/ui/button";
+import { PlusIcon, VercelIcon, ChevronDownIcon } from "./icons";
+import { useSidebar } from "./ui/sidebar";
+import { memo } from "react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
+import { Grid } from "lucide-react";
+import { useAdmin } from "@/hooks/use-admin";
+import { useOrganizations } from "@/app/hooks/useOrganizations";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { useGlobalState } from "@/hooks/use-global-state";
 
 function PureChatHeader({
   chatId,
@@ -24,8 +33,13 @@ function PureChatHeader({
 }) {
   const router = useRouter();
   const { open } = useSidebar();
-
   const { width: windowWidth } = useWindowSize();
+  const { isAdmin } = useAdmin();
+  const { organizations, isLoading } = useOrganizations();
+  const {
+    state: { selectedOrgId },
+    setState: setSelectedOrgId,
+  } = useGlobalState();
 
   return (
     <header className="flex sticky top-0 bg-background py-1.5 items-center px-2 md:px-2 gap-2">
@@ -38,7 +52,7 @@ function PureChatHeader({
               variant="outline"
               className="order-2 md:order-1 md:px-2 px-2 md:h-fit ml-auto md:ml-0"
               onClick={() => {
-                router.push('/');
+                router.push("/");
                 router.refresh();
               }}
             >
@@ -57,11 +71,44 @@ function PureChatHeader({
         />
       )}
 
+      {isAdmin && (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="outline"
+              className="order-1 md:order-3 md:px-2 md:h-[34px]"
+            >
+              {isLoading
+                ? "Loading..."
+                : selectedOrgId
+                  ? organizations.find((org) => org.id === selectedOrgId)
+                      ?.name || "Select Org"
+                  : "Select Org"}
+              <ChevronDownIcon />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="min-w-[200px]">
+            {organizations.map((org) => (
+              <DropdownMenuItem
+                key={org.id}
+                onSelect={() => setSelectedOrgId({ selectedOrgId: org.id })}
+                className="gap-4 group/item flex flex-row justify-between items-center"
+                data-active={org.id === selectedOrgId}
+              >
+                <div className="flex flex-col gap-1 items-start">
+                  <div>{org.name}</div>
+                </div>
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
+
       <Tooltip>
         <TooltipTrigger asChild>
           <Button
             variant="outline"
-            className="order-1 md:order-3 px-2 h-fit"
+            className="order-1 md:order-4 px-2 h-fit"
             asChild
           >
             <Link href="/rag-resources">
@@ -74,7 +121,7 @@ function PureChatHeader({
       </Tooltip>
 
       <Button
-        className="bg-zinc-900 dark:bg-zinc-100 hover:bg-zinc-800 dark:hover:bg-zinc-200 text-zinc-50 dark:text-zinc-900 hidden md:flex py-1.5 px-2 h-fit md:h-[34px] order-4 md:ml-auto"
+        className="bg-zinc-900 dark:bg-zinc-100 hover:bg-zinc-800 dark:hover:bg-zinc-200 text-zinc-50 dark:text-zinc-900 hidden md:flex py-1.5 px-2 h-fit md:h-[34px] order-5 md:ml-auto"
         asChild
       >
         <Link

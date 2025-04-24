@@ -1,25 +1,42 @@
-'use client';
+"use client";
 
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { useState } from "react";
+import { Loading } from "@/components/loading";
 
 export default function SettingsPage() {
+  const [isLoading, setIsLoading] = useState(false);
+
   const handleSeed = async () => {
+    setIsLoading(true);
     try {
-      const response = await fetch('/api/seed', {
-        method: 'POST',
+      const response = await fetch("/api/seed", {
+        method: "POST",
       });
       const data = await response.json();
 
       if (response.ok) {
-        alert('Successfully seeded data!');
+        alert("Successfully seeded data!");
       } else {
         alert(`Error: ${data.error}`);
       }
     } catch (error) {
-      alert('Failed to seed data');
+      alert("Failed to seed data");
+    } finally {
+      setIsLoading(false);
     }
   };
+
+  if (isLoading) {
+    return <Loading />;
+  }
 
   return (
     <div className="space-y-6">
@@ -37,9 +54,7 @@ export default function SettingsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Button onClick={handleSeed}>
-            Seed Organization Data
-          </Button>
+          <Button onClick={handleSeed}>Seed Organization Data</Button>
         </CardContent>
       </Card>
     </div>

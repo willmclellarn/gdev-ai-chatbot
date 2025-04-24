@@ -1,32 +1,27 @@
-'use client';
+"use client";
 
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { useWindowSize } from 'usehooks-ts';
-import { useState } from 'react';
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useWindowSize } from "usehooks-ts";
+import { useState } from "react";
 
-import { SidebarToggle } from '@/components/sidebar-toggle';
-import { Button } from '@/components/ui/button';
-import { PlusIcon, DownloadIcon } from '../icons';
-import { useSidebar } from '../ui/sidebar';
-import { memo } from 'react';
-import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip';
+import { SidebarToggle } from "@/components/sidebar-toggle";
+import { Button } from "@/components/ui/button";
+import { PlusIcon, DownloadIcon, ChevronDownIcon } from "../icons";
+import { useSidebar } from "../ui/sidebar";
+import { memo } from "react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { embeddingModels } from '@/lib/ai/models';
-import {
-  CheckCircleFillIcon,
-  ChevronDownIcon,
-  UserIcon,
-  UsersIcon,
-  GlobeIcon,
-} from '../icons';
-import { useAdmin } from '@/hooks/use-admin';
-import { useGlobalState } from '@/hooks/use-global-state';
+} from "@/components/ui/dropdown-menu";
+import { embeddingModels } from "@/lib/ai/models";
+import { CheckCircleFillIcon, UserIcon, UsersIcon, GlobeIcon } from "../icons";
+import { useAdmin } from "@/hooks/use-admin";
+import { useGlobalState } from "@/hooks/use-global-state";
+import { useOrganizations } from "@/app/hooks/useOrganizations";
 
 interface RAGHeaderProps {
   hasChanges?: boolean;
@@ -37,9 +32,19 @@ function PureRAGHeader({ hasChanges = false, onSaveDefault }: RAGHeaderProps) {
   const router = useRouter();
   const { open } = useSidebar();
   const { width: windowWidth } = useWindowSize();
-  const { state: { embeddingModel }, setState: setEmbeddingModel } = useGlobalState();
-  const [resourceScope, setResourceScope] = useState<'user' | 'org' | 'admin'>('user');
+  const {
+    state: { embeddingModel },
+    setState: setEmbeddingModel,
+  } = useGlobalState();
+  const [resourceScope, setResourceScope] = useState<"user" | "org" | "admin">(
+    "user"
+  );
   const { isAdmin } = useAdmin();
+  const { organizations, isLoading } = useOrganizations();
+  const {
+    state: { selectedOrgId },
+    setState: setSelectedOrgId,
+  } = useGlobalState();
 
   return (
     <header className="flex sticky top-0 bg-background py-1.5 items-center px-2 md:px-2 gap-2 z-50">
@@ -52,7 +57,7 @@ function PureRAGHeader({ hasChanges = false, onSaveDefault }: RAGHeaderProps) {
               variant="outline"
               className="order-2 md:order-1 md:px-2 px-2 md:h-fit ml-auto md:ml-0"
               onClick={() => {
-                router.push('/');
+                router.push("/");
                 router.refresh();
               }}
             >
@@ -102,18 +107,28 @@ function PureRAGHeader({ hasChanges = false, onSaveDefault }: RAGHeaderProps) {
             variant="outline"
             className="order-1 md:order-3 md:px-2 md:h-[34px]"
           >
-            {resourceScope === 'user' ? <UserIcon /> : resourceScope === 'org' ? <UsersIcon /> : <GlobeIcon />}
+            {resourceScope === "user" ? (
+              <UserIcon />
+            ) : resourceScope === "org" ? (
+              <UsersIcon />
+            ) : (
+              <GlobeIcon />
+            )}
             <span className="ml-2">
-              {resourceScope === 'user' ? 'Personal' : resourceScope === 'org' ? 'Organization' : 'System-wide'}
+              {resourceScope === "user"
+                ? "Personal"
+                : resourceScope === "org"
+                  ? "Organization"
+                  : "System-wide"}
             </span>
             <ChevronDownIcon />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="min-w-[200px]">
           <DropdownMenuItem
-            onSelect={() => setResourceScope('user')}
+            onSelect={() => setResourceScope("user")}
             className="gap-4 group/item flex flex-row justify-between items-center"
-            data-active={resourceScope === 'user'}
+            data-active={resourceScope === "user"}
           >
             <div className="flex flex-col gap-1 items-start">
               <div>Personal</div>
@@ -126,9 +141,9 @@ function PureRAGHeader({ hasChanges = false, onSaveDefault }: RAGHeaderProps) {
             </div>
           </DropdownMenuItem>
           <DropdownMenuItem
-            onSelect={() => setResourceScope('org')}
+            onSelect={() => setResourceScope("org")}
             className="gap-4 group/item flex flex-row justify-between items-center"
-            data-active={resourceScope === 'org'}
+            data-active={resourceScope === "org"}
           >
             <div className="flex flex-col gap-1 items-start">
               <div>Organization</div>
@@ -142,9 +157,9 @@ function PureRAGHeader({ hasChanges = false, onSaveDefault }: RAGHeaderProps) {
           </DropdownMenuItem>
           {isAdmin && (
             <DropdownMenuItem
-              onSelect={() => setResourceScope('admin')}
+              onSelect={() => setResourceScope("admin")}
               className="gap-4 group/item flex flex-row justify-between items-center"
-              data-active={resourceScope === 'admin'}
+              data-active={resourceScope === "admin"}
             >
               <div className="flex flex-col gap-1 items-start">
                 <div>System-wide</div>
@@ -160,19 +175,54 @@ function PureRAGHeader({ hasChanges = false, onSaveDefault }: RAGHeaderProps) {
         </DropdownMenuContent>
       </DropdownMenu>
 
+      {isAdmin && (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="outline"
+              className="order-1 md:order-4 md:px-2 md:h-[34px]"
+            >
+              {isLoading
+                ? "Loading..."
+                : selectedOrgId
+                  ? organizations.find((org) => org.id === selectedOrgId)
+                      ?.name || "Select Org"
+                  : "Select Org"}
+              <ChevronDownIcon />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="min-w-[200px]">
+            {organizations.map((org) => (
+              <DropdownMenuItem
+                key={org.id}
+                onSelect={() => setSelectedOrgId({ selectedOrgId: org.id })}
+                className="gap-4 group/item flex flex-row justify-between items-center"
+                data-active={org.id === selectedOrgId}
+              >
+                <div className="flex flex-col gap-1 items-start">
+                  <div>{org.name}</div>
+                </div>
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
+
       {hasChanges && onSaveDefault && (
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
               variant="default"
-              className="order-1 md:order-4 md:px-2 md:h-[34px]"
+              className="order-1 md:order-5 md:px-2 md:h-[34px]"
               onClick={onSaveDefault}
             >
               <DownloadIcon />
               <span className="ml-2">Save Default</span>
             </Button>
           </TooltipTrigger>
-          <TooltipContent>Save current chunking settings as default</TooltipContent>
+          <TooltipContent>
+            Save current chunking settings as default
+          </TooltipContent>
         </Tooltip>
       )}
     </header>
