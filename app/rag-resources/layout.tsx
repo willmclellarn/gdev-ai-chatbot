@@ -1,8 +1,8 @@
-import { cookies } from 'next/headers';
-import { RagSidebar } from '@/components/rag-sidebar';
-import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
-import { auth } from '../(auth)/auth';
-import Script from 'next/script';
+import { cookies } from "next/headers";
+import { RagSidebar } from "@/components/rag-sidebar";
+import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+import { auth } from "../(auth)/auth";
+import Script from "next/script";
 
 export const experimental_ppr = true;
 
@@ -12,7 +12,7 @@ export default async function Layout({
   children: React.ReactNode;
 }) {
   const [session, cookieStore] = await Promise.all([auth(), cookies()]);
-  const isCollapsed = cookieStore.get('sidebar:state')?.value !== 'true';
+  const isCollapsed = cookieStore.get("sidebar:state")?.value !== "true";
 
   return (
     <>
@@ -21,8 +21,9 @@ export default async function Layout({
         strategy="beforeInteractive"
       />
       <SidebarProvider defaultOpen={!isCollapsed}>
-        <RagSidebar />
-        <SidebarInset>{children}</SidebarInset>
+        <RagSidebar>
+          <main className="flex-1 overflow-auto py-2 px-6">{children}</main>
+        </RagSidebar>
       </SidebarProvider>
     </>
   );

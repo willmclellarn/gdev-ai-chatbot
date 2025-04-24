@@ -235,7 +235,7 @@ export default function RAGResourcesPage() {
 
   if (isPageLoading) {
     return (
-      <div className="flex flex-col h-full">
+      <div className="h-full overflow-auto">
         <RAGHeader />
         <div className="container mx-auto py-8 flex-1">
           <Card>
@@ -251,7 +251,7 @@ export default function RAGResourcesPage() {
 
   if (isLoading) {
     return (
-      <div className="flex flex-col h-full">
+      <div className="h-full overflow-auto">
         <RAGHeader
           hasChanges={hasChunkingChanges}
           onSaveDefault={handleSaveDefault}
@@ -269,13 +269,13 @@ export default function RAGResourcesPage() {
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="h-full overflow-auto">
       <RAGHeader
         hasChanges={hasChunkingChanges}
         onSaveDefault={handleSaveDefault}
       />
 
-      <div className="container mx-auto px-4 py-8 flex-1">
+      <div className="container mx-auto px-4 py-8">
         <Card>
           <CardHeader>
             <CardTitle>RAG Resources</CardTitle>

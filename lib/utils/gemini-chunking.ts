@@ -56,6 +56,26 @@ export function validateChunkBeginningsExist(
   };
 }
 
+function extractFullChunks(
+  documentText: string,
+  chunkPositions: { start: number; end: number }[]
+): string[] {
+  const chunks: string[] = [];
+
+  for (let i = 0; i < chunkPositions.length; i++) {
+    const currentChunk = chunkPositions[i];
+    const nextChunk = chunkPositions[i + 1];
+
+    // Extract from current chunk's start to either next chunk's start or end of document
+    const chunkEnd = nextChunk ? nextChunk.start : documentText.length;
+    const chunkContent = documentText.slice(currentChunk.start, chunkEnd);
+
+    chunks.push(chunkContent);
+  }
+
+  return chunks;
+}
+
 export async function splitByGeminiGenius(
   documentText: string
 ): Promise<{ chunks: string[]; validation: ValidationResult; status: string }> {
@@ -86,8 +106,18 @@ export async function splitByGeminiGenius(
     JSON.stringify(object, null, 2)
   );
 
-  const chunks = object.sections.map((section) => section.startContent);
-  const validation = validateChunkBeginningsExist(documentText, chunks);
+  const chunkBeginnings = object.sections.map(
+    (section) => section.startContent
+  );
+  const validation = validateChunkBeginningsExist(
+    documentText,
+    chunkBeginnings
+  );
+
+  // Extract full chunks using the validated positions
+  const fullChunks = validation.isValid
+    ? extractFullChunks(documentText, validation.chunkPositions)
+    : [];
 
   if (!validation.isValid) {
     console.warn(
@@ -97,7 +127,7 @@ export async function splitByGeminiGenius(
   }
 
   return {
-    chunks,
+    chunks: fullChunks,
     validation,
     status: validation.isValid
       ? "✅ Chunking validation successful"

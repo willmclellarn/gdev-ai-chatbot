@@ -27,7 +27,12 @@ export function RagChunkPreview({
     <div className="space-y-4">
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <Label>Preview Results (First 5 Chunks)</Label>
+          <div className="flex items-center gap-2">
+            <Label>Preview Results (First 5 Chunks)</Label>
+            <span className="text-sm text-muted-foreground">
+              ({previewChunks.length} total chunks)
+            </span>
+          </div>
           <span className="text-sm text-muted-foreground">
             {chunkingStrategy === "auto" && actualStrategy && (
               <span>
