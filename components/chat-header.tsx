@@ -21,6 +21,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useGlobalState } from "@/hooks/use-global-state";
+import { RagResourcesLink } from "./rag-resources-link";
 
 function PureChatHeader({
   chatId,
@@ -104,21 +105,7 @@ function PureChatHeader({
         </DropdownMenu>
       )}
 
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            variant="outline"
-            className="order-1 md:order-4 px-2 h-fit"
-            asChild
-          >
-            <Link href="/rag-resources">
-              <Grid className="h-4 w-4" />
-              <span className="sr-only md:not-sr-only ml-2">RAG Resources</span>
-            </Link>
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>RAG Resources</TooltipContent>
-      </Tooltip>
+      <RagResourcesLink />
 
       <Button
         className="bg-zinc-900 dark:bg-zinc-100 hover:bg-zinc-800 dark:hover:bg-zinc-200 text-zinc-50 dark:text-zinc-900 hidden md:flex py-1.5 px-2 h-fit md:h-[34px] order-5 md:ml-auto"

@@ -7,7 +7,7 @@ export async function POST(req: NextRequest) {
       await req.json();
 
     // log the chunking details
-    console.log("Chunking details:", {
+    console.log("🔵 Chunking details:", {
       text,
       chunkingStrategy,
       chunkSize,
@@ -38,6 +38,7 @@ export async function POST(req: NextRequest) {
       chunks: result.chunks,
       previewText,
       strategy: result.strategy,
+      validation: result.validation,
     });
   } catch (error) {
     console.error("🔵 Error splitting text:", error);

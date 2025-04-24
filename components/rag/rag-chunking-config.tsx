@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import { Label } from '@/components/ui/label';
-import { Slider } from '@/components/ui/slider';
-import { Input } from '@/components/ui/input';
+import { Label } from "@/components/ui/label";
+import { Slider } from "@/components/ui/slider";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -10,7 +10,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ChunkingStrategy } from '@/lib/utils/chunking';
+import { ChunkingStrategy } from "@/lib/utils/chunking";
+import { CHUNKING_STRATEGIES } from "@/lib/constants";
 
 interface RagChunkingConfigProps {
   chunkingStrategy: ChunkingStrategy;
@@ -46,27 +47,36 @@ export function RagChunkingConfig({
               <SelectValue placeholder="Select chunking strategy" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="auto">Auto (Recommended)</SelectItem>
+              {CHUNKING_STRATEGIES.map((strategy) => (
+                <SelectItem key={strategy} value={strategy}>
+                  {strategy}
+                </SelectItem>
+              ))}
+              {/* <SelectItem value="auto">Auto (Recommended)</SelectItem>
               <SelectItem value="token">Token-based</SelectItem>
               <SelectItem value="headers">Header-based</SelectItem>
               <SelectItem value="centered">Centered Content</SelectItem>
               <SelectItem value="html">HTML Structure</SelectItem>
               <SelectItem value="keyword">Keyword-based</SelectItem>
-              <SelectItem value="gemini-genius">Gemini Genius</SelectItem>
+              <SelectItem value="gemini-genius">Gemini Genius</SelectItem> */}
             </SelectContent>
           </Select>
-          <p className="text-sm text-muted-foreground">
-            {chunkingStrategy === 'auto' && 'Automatically detect the best chunking strategy based on document type and content'}
-            {chunkingStrategy === 'token' && 'Split text into chunks based on token count'}
-            {chunkingStrategy === 'headers' && 'Split text into chunks based on markdown headers'}
-            {chunkingStrategy === 'centered' && 'Split text into chunks based on centered content'}
+          {/* <p className="text-sm text-muted-foreground">
+            {chunkingStrategy === "auto" &&
+              "Automatically detect the best chunking strategy based on document type and content"}
+            {chunkingStrategy === "token" &&
+              "Split text into chunks based on token count"}
+            {chunkingStrategy === "headers" &&
+              "Split text into chunks based on markdown headers"}
+            {chunkingStrategy === "centered" &&
+              "Split text into chunks based on centered content"}
             {chunkingStrategy === 'html' && 'Split text into chunks based on HTML structural elements'}
             {chunkingStrategy === 'keyword' && 'Split text into chunks based on specified keywords'}
-          </p>
+          </p> */}
         </div>
       </div>
 
-      {chunkingStrategy === 'token' && (
+      {/* {chunkingStrategy === 'token' && (
         <div className="flex flex-col md:flex-row md:space-x-4 space-y-4 md:space-y-0">
           <div className="flex-1 space-y-2">
             <Label>Chunk Size (tokens)</Label>
@@ -95,9 +105,9 @@ export function RagChunkingConfig({
             </p>
           </div>
         </div>
-      )}
+      )} */}
 
-      {chunkingStrategy === ('keyword' as ChunkingStrategy) && (
+      {/* {chunkingStrategy === ('keyword' as ChunkingStrategy) && (
         <div className="space-y-2">
           <Label>Keywords (comma-separated)</Label>
           <Input
@@ -109,7 +119,7 @@ export function RagChunkingConfig({
             Enter keywords that should be used to split the text into chunks
           </p>
         </div>
-      )}
+      )} */}
     </div>
   );
 }

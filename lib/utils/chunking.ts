@@ -4,15 +4,10 @@ import { JSDOM } from "jsdom";
 import { ProcessedDocument } from "./file-processing";
 import { myProvider } from "@/lib/ai/providers";
 import { splitByGeminiGenius } from "./gemini-chunking";
+import { CHUNKING_STRATEGIES } from "../constants";
 
-export type ChunkingStrategy =
-  | "token"
-  | "headers"
-  | "centered"
-  | "html"
-  | "keyword"
-  | "auto"
-  | "gemini-genius";
+/** Literal-union type that matches any item in the array */
+export type ChunkingStrategy = (typeof CHUNKING_STRATEGIES)[number];
 
 export interface ChunkingOptions {
   strategy: ChunkingStrategy;
@@ -20,20 +15,6 @@ export interface ChunkingOptions {
   chunkOverlap: number; // For token-based chunking fallback
   keywords?: string[]; // Optional keywords for keyword-based chunking
   metadata?: ProcessedDocument["metadata"]; // Optional metadata for preserving formatting
-}
-
-function splitByHeaders(text: string): string[] {
-  // Split by markdown headers
-  const headerRegex = /^#{1,6}\s+.+$/gm;
-  const sections = text.split(headerRegex);
-  return sections.filter((section) => section.trim().length > 0);
-}
-
-function splitByHtmlHeaders(html: string): string[] {
-  // Split by HTML header tags
-  const headerRegex = /<h[1-6].*?>.*?<\/h[1-6]>/gi;
-  const sections = html.split(headerRegex);
-  return sections.filter((section) => section.trim().length > 0);
 }
 
 function splitByTokens(
@@ -52,187 +33,83 @@ function splitByTokens(
   return chunks;
 }
 
-function splitByKeywords(text: string, keywords: string[]): string[] {
-  if (!keywords || keywords.length === 0) {
-    return [text]; // If no keywords, return the whole text as one chunk
-  }
+// function splitByKeywords(text: string, keywords: string[]): string[] {
+//   if (!keywords || keywords.length === 0) {
+//     return [text]; // If no keywords, return the whole text as one chunk
+//   }
 
-  const chunks: string[] = [];
-  let lastIndex = 0;
-  let currentChunk = "";
+//   const chunks: string[] = [];
+//   let lastIndex = 0;
+//   let currentChunk = "";
 
-  // Create a regex pattern that matches any of the keywords
-  const keywordPattern = new RegExp(
-    keywords.map((k) => `\\b${k}\\b`).join("|"),
-    "gi"
-  );
-  let match;
+//   // Create a regex pattern that matches any of the keywords
+//   const keywordPattern = new RegExp(
+//     keywords.map((k) => `\\b${k}\\b`).join("|"),
+//     "gi"
+//   );
+//   let match;
 
-  while ((match = keywordPattern.exec(text)) !== null) {
-    const keyword = match[0];
-    const matchIndex = match.index;
+//   while ((match = keywordPattern.exec(text)) !== null) {
+//     const keyword = match[0];
+//     const matchIndex = match.index;
 
-    // Add content before the keyword if it exists
-    if (matchIndex > lastIndex) {
-      currentChunk += text.slice(lastIndex, matchIndex);
-    }
+//     // Add content before the keyword if it exists
+//     if (matchIndex > lastIndex) {
+//       currentChunk += text.slice(lastIndex, matchIndex);
+//     }
 
-    // Add the keyword and its surrounding context
-    currentChunk += keyword;
-    lastIndex = matchIndex + keyword.length;
+//     // Add the keyword and its surrounding context
+//     currentChunk += keyword;
+//     lastIndex = matchIndex + keyword.length;
 
-    // If we have a decent chunk, push it and start a new one
-    if (currentChunk.length > 50) {
-      // arbitrary threshold
-      chunks.push(currentChunk.trim());
-      currentChunk = "";
-    }
-  }
+//     // If we have a decent chunk, push it and start a new one
+//     if (currentChunk.length > 50) {
+//       // arbitrary threshold
+//       chunks.push(currentChunk.trim());
+//       currentChunk = "";
+//     }
+//   }
 
-  // Add any remaining content
-  if (lastIndex < text.length) {
-    currentChunk += text.slice(lastIndex);
-  }
-  if (currentChunk.trim()) {
-    chunks.push(currentChunk.trim());
-  }
+//   // Add any remaining content
+//   if (lastIndex < text.length) {
+//     currentChunk += text.slice(lastIndex);
+//   }
+//   if (currentChunk.trim()) {
+//     chunks.push(currentChunk.trim());
+//   }
 
-  return chunks.filter((chunk) => chunk.length > 0);
-}
+//   return chunks.filter((chunk) => chunk.length > 0);
+// }
 
-/**
- * -----------------------------------------------
- * Improved HTML-based chunking with DOM parsing
- * -----------------------------------------------
- */
-function improvedSplitByHtmlStructure(
-  html: string,
-  applyTokenFallback: boolean = false
-): { chunks: string[]; exceededChunkSize: boolean } {
-  // Use JSDOM (or Cheerio, etc.) to parse the HTML
-  const dom = new JSDOM(html);
-  const document = dom.window.document;
-  let exceededChunkSize = false;
-
-  // We will gather chunks by looking at top-level structural and header elements.
-  // That includes <section>, <article>, <div>, <main>, <nav>, <aside>, <header>, <footer>
-  // and <h1> through <h6> in the top-level or nested inside.
-  const elements = Array.from(
-    document.querySelectorAll(
-      "section, article, div, main, nav, aside, header, footer, h1, h2, h3, h4, h5, h6"
-    )
-  );
-
-  console.log("🔵 [Chunking] Found", elements.length, "elements to chunk");
-
-  const chunks: string[] = [];
-
-  elements.forEach((element) => {
-    const htmlElement = element as HTMLElement;
-    const outer = htmlElement.outerHTML.trim();
-
-    if (outer.length) {
-      const tokenCount = outer.split(/\s+/).length;
-      if (tokenCount > getMaxChunkSize()) {
-        exceededChunkSize = true;
-        if (applyTokenFallback) {
-          // If the chunk is too large, subdivide with token approach
-          const subdivided = splitByTokens(
-            outer,
-            getMaxChunkSize(),
-            getMaxChunkOverlap()
-          );
-          chunks.push(...subdivided);
-        } else {
-          // If not applying token fallback, just add the large chunk with a warning
-          console.warn("🔵 [Chunking] Chunk size exceeded:", {
-            tokenCount,
-            maxAllowed: getMaxChunkSize(),
-            element: element.tagName,
-          });
-          chunks.push(outer);
-        }
-      } else {
-        chunks.push(outer);
-      }
-    }
-  });
-
-  // Handle text content outside of structural elements
-  const bodyText = document.body.textContent?.trim();
-  if (bodyText && bodyText.length > 0) {
-    const textChunks = splitByTokens(
-      bodyText,
-      getMaxChunkSize(),
-      getMaxChunkOverlap()
-    );
-    chunks.push(...textChunks);
-  }
-
-  // If no chunks were created, fall back to token-based chunking of the entire HTML
-  if (chunks.length === 0) {
-    const fallbackChunks = splitByTokens(
-      html,
-      getMaxChunkSize(),
-      getMaxChunkOverlap()
-    );
-    return { chunks: fallbackChunks, exceededChunkSize };
-  }
-
-  return { chunks, exceededChunkSize };
-}
-
-function getMaxChunkSize(): number {
-  // Get the current embedding model from the provider
-  const currentModel = myProvider.textEmbeddingModel("small-model").modelId;
-
-  // Define token limits for different models
-  const modelTokenLimits: Record<string, number> = {
-    "text-embedding-3-small": 8192,
-    "text-embedding-3-large": 8192,
-    "text-embedding-ada-002": 8192,
-  };
-
-  // Get the token limit for the current model, defaulting to 8192 if unknown
-  const tokenLimit = modelTokenLimits[currentModel] || 8192;
-
-  // Return 50% of the token limit
-  return Math.floor(tokenLimit * 0.5);
-}
-
-function getMaxChunkOverlap(): number {
-  return 200;
-}
-
-export async function determineBestStrategy(
-  fileType: string,
-  content: string
-): Promise<ChunkingStrategy> {
-  // Check file type first
-  switch (fileType.toLowerCase()) {
-    case "md":
-      return "headers"; // Markdown files are best chunked by headers
-    case "html":
-      return "html"; // HTML files should use HTML structure-based chunking
-    case "pdf":
-    case "docx":
-    case "doc":
-      // For these formats, analyze the content to determine the best strategy
-      if (content.includes("# ")) {
-        return "headers"; // If it has markdown headers
-      } else if (
-        content.includes("<h1") ||
-        content.includes("<h2") ||
-        content.includes("<h3")
-      ) {
-        return "html"; // If it has HTML headers
-      } else {
-        return "token"; // Default to token-based for unstructured content
-      }
-    default:
-      return "token"; // Default strategy for unknown file types
-  }
-}
+// export async function determineBestStrategy(
+//   fileType: string,
+//   content: string
+// ): Promise<ChunkingStrategy> {
+//   // Check file type first
+//   switch (fileType.toLowerCase()) {
+//     case "md":
+//       return "headers"; // Markdown files are best chunked by headers
+//     case "html":
+//       return "html"; // HTML files should use HTML structure-based chunking
+//     case "pdf":
+//     case "docx":
+//     case "doc":
+//       // For these formats, analyze the content to determine the best strategy
+//       if (content.includes("# ")) {
+//         return "headers"; // If it has markdown headers
+//       } else if (
+//         content.includes("<h1") ||
+//         content.includes("<h2") ||
+//         content.includes("<h3")
+//       ) {
+//         return "html"; // If it has HTML headers
+//       } else {
+//         return "token"; // Default to token-based for unstructured content
+//       }
+//     default:
+//       return "token"; // Default strategy for unknown file types
+//   }
+// }
 
 export async function splitTextIntoChunks(
   text: string,
@@ -241,6 +118,11 @@ export async function splitTextIntoChunks(
   chunks: string[];
   strategy: ChunkingStrategy;
   exceededChunkSize?: boolean;
+  validation?: {
+    isValid: boolean;
+    issues: string[];
+    chunkPositions: { start: number; end: number }[];
+  };
 }> {
   const { strategy, chunkSize, chunkOverlap, keywords } = options;
 
@@ -257,41 +139,53 @@ export async function splitTextIntoChunks(
 
   let chunks: string[];
   let exceededChunkSize = false;
+  let validation:
+    | {
+        isValid: boolean;
+        issues: string[];
+        chunkPositions: { start: number; end: number }[];
+      }
+    | undefined;
 
   switch (effectiveStrategy) {
-    case "headers":
-      console.log("🔵 [Chunking] Using header-based chunking");
-      chunks = splitByHeaders(text);
-      break;
+    // case "headers":
+    //   console.log("🔵 [Chunking] Using header-based chunking");
+    //   chunks = splitByHeaders(text);
+    //   break;
 
-    case "centered":
-      console.log("🔵 [Chunking] Using centered content chunking");
-      chunks = splitByTokens(text, chunkSize, chunkOverlap);
-      break;
+    // case "centered":
+    //   console.log("🔵 [Chunking] Using centered content chunking");
+    //   chunks = splitByTokens(text, chunkSize, chunkOverlap);
+    //   break;
 
-    case "html":
-      console.log("🔵 [Chunking] Using HTML structure-based chunking");
-      const htmlResult = improvedSplitByHtmlStructure(text, false);
-      chunks = htmlResult.chunks;
-      exceededChunkSize = htmlResult.exceededChunkSize;
-      break;
+    // case "html":
+    //   console.log("🔵 [Chunking] Using HTML structure-based chunking");
+    //   const htmlResult = improvedSplitByHtmlStructure(text, false);
+    //   chunks = htmlResult.chunks;
+    //   exceededChunkSize = htmlResult.exceededChunkSize;
+    //   break;
 
-    case "keyword":
-      console.log(
-        "🔵 [Chunking] Using keyword-based chunking with keywords:",
-        keywords
-      );
-      chunks = splitByKeywords(text, keywords || []);
+    // case "keyword":
+    //   console.log(
+    //     "🔵 [Chunking] Using keyword-based chunking with keywords:",
+    //     keywords
+    //   );
+    //   chunks = splitByKeywords(text, keywords || []);
+    //   break;
+
+    case "gemini-genius":
+      console.log("🔵 [Chunking] Using Gemini Genius chunking");
+      const result = await splitByGeminiGenius(text);
+      if (!result.validation.isValid) {
+        console.warn("Chunk validation issues:", result.validation.issues);
+      }
+      chunks = result.chunks;
+      validation = result.validation;
       break;
 
     case "token":
       console.log("🔵 [Chunking] Using token-based chunking");
       chunks = splitByTokens(text, chunkSize, chunkOverlap);
-      break;
-
-    case "gemini-genius":
-      console.log("🔵 [Chunking] Using Gemini Genius chunking");
-      chunks = await splitByGeminiGenius(text);
       break;
 
     default:
@@ -309,5 +203,10 @@ export async function splitTextIntoChunks(
   if (exceededChunkSize) {
     console.warn("🔵 [Chunking] Some chunks exceeded the maximum allowed size");
   }
-  return { chunks, strategy: effectiveStrategy, exceededChunkSize };
+  return {
+    chunks,
+    strategy: effectiveStrategy,
+    exceededChunkSize,
+    validation,
+  };
 }

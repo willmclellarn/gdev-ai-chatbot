@@ -128,7 +128,7 @@ export async function extractFormattedTextFromFile(
       text = result.value;
       format = "html";
 
-      console.log("🔵 HTML result:", text);
+      // console.log("🔵 HTML result:", text);
 
       // Enhanced metadata extraction for Google Docs
       if (result.messages) {

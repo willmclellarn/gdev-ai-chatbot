@@ -23,9 +23,44 @@ function createChunkingPrompt(documentText: string) {
   `;
 }
 
+interface ValidationResult {
+  isValid: boolean;
+  issues: string[];
+  chunkPositions: { start: number; end: number }[];
+}
+
+export function validateChunkBeginningsExist(
+  documentText: string,
+  chunkBeginnings: string[]
+): ValidationResult {
+  const issues: string[] = [];
+  const chunkPositions: { start: number; end: number }[] = [];
+
+  for (let i = 0; i < chunkBeginnings.length; i++) {
+    const chunkBeginning = chunkBeginnings[i];
+    const startIndex = documentText.indexOf(chunkBeginning);
+
+    if (startIndex === -1) {
+      issues.push(`Chunk ${i + 1} not found in original document`);
+      continue;
+    }
+
+    const endIndex = startIndex + chunkBeginning.length;
+    chunkPositions.push({ start: startIndex, end: endIndex });
+  }
+
+  return {
+    isValid: issues.length === 0,
+    issues,
+    chunkPositions,
+  };
+}
+
 export async function splitByGeminiGenius(
   documentText: string
-): Promise<string[]> {
+): Promise<{ chunks: string[]; validation: ValidationResult; status: string }> {
+  console.log("💎💎💎 [Chunking] Using Gemini Genius chunking");
+
   fs.writeFileSync("document.txt", documentText);
   console.log("created document.txt");
   const { object } = await generateObject({
@@ -51,7 +86,21 @@ export async function splitByGeminiGenius(
     JSON.stringify(object, null, 2)
   );
 
-  // try to find them in the text after normalizing and then split by the start content
+  const chunks = object.sections.map((section) => section.startContent);
+  const validation = validateChunkBeginningsExist(documentText, chunks);
 
-  return ["chunk 1", "chunk 2", "chunk 3"];
+  if (!validation.isValid) {
+    console.warn(
+      "🔵Gemini Genius Chunking Validation Issues:",
+      validation.issues
+    );
+  }
+
+  return {
+    chunks,
+    validation,
+    status: validation.isValid
+      ? "✅ Chunking validation successful"
+      : "❌ Chunking validation failed",
+  };
 }

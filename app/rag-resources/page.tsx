@@ -9,7 +9,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertCircle, Bell, Eye } from "lucide-react";
+import { AlertCircle, Bell, Eye, Loader2 } from "lucide-react";
 import { RAGHeader } from "@/components/rag/rag-header";
 import { useAdmin } from "@/hooks/use-admin";
 import { RagFileSelection } from "@/components/rag/rag-file-selection";
@@ -43,7 +43,7 @@ export default function RAGResourcesPage() {
   const [chunkOverlap, setChunkOverlap] = useState(200);
   const [isUploading, setIsUploading] = useState(false);
   const [chunkingStrategy, setChunkingStrategy] =
-    useState<ChunkingStrategy>("token");
+    useState<ChunkingStrategy>("gemini-genius");
   const [previewText, setPreviewText] = useState("");
   const [previewFormat, setPreviewFormat] = useState<
     "plain" | "html" | "markdown"
@@ -54,6 +54,7 @@ export default function RAGResourcesPage() {
   const [previewChunks, setPreviewChunks] = useState<string[]>([]);
   const [keywords, setKeywords] = useState<string>("");
   const [hasChunkingChanges, setHasChunkingChanges] = useState(false);
+  const [isPreviewLoading, setIsPreviewLoading] = useState(false);
   const { isAdmin, isLoading } = useAdmin();
   const {
     state: { embeddingModel },
@@ -62,6 +63,10 @@ export default function RAGResourcesPage() {
     null
   );
   const { data: session } = useSession();
+  const [validation, setValidation] = useState<{
+    issues: string[];
+    chunkPositions: { start: number; end: number }[];
+  } | null>(null);
 
   useEffect(() => {
     const fetchLocalFiles = async () => {
@@ -189,26 +194,20 @@ export default function RAGResourcesPage() {
   };
 
   const handlePreviewChunks = async () => {
+    if (!file) {
+      toast.error("No file provided");
+      setPreviewChunks([]);
+      return;
+    }
+    const textFromFile = await extractPlainTextFromFile(file);
+
+    setIsPreviewLoading(true);
     try {
-      if (!file) {
-        toast.error("No file provided");
-        setPreviewChunks([]);
-        return;
-      }
-
-      const textFromFile = await extractPlainTextFromFile(file);
-
-      // const formData = await createRagFormData({
-      //   file: textFromFile,
-      //   selectedLocalFile,
-      //   chunkingStrategy,
-      //   chunkSize,
-      //   chunkOverlap,
-      //   keywords,
-      // });
-
-      const result = await fetch("/api/rag/generate-chunks", {
+      const response = await fetch("/api/rag/generate-chunks", {
         method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({
           text: textFromFile,
           chunkingStrategy,
@@ -218,22 +217,19 @@ export default function RAGResourcesPage() {
         }),
       });
 
-      if (!result.ok) {
-        const errorText = await result.text();
-        console.error("🔵 Rag Preview API error:", errorText);
-        setPreviewChunks([]);
-        return;
+      if (!response.ok) {
+        throw new Error("Failed to generate chunks");
       }
 
-      const data = await result.json();
-      // setPreviewText(data.previewText);
-      setPreviewChunks(data.chunks || []);
-      if (chunkingStrategy === "auto") {
-        setActualStrategy(data.strategy);
-      }
+      const data = await response.json();
+      setPreviewChunks(data.chunks);
+      setActualStrategy(data.strategy);
+      setValidation(data.validation || null);
     } catch (error) {
-      console.error("🔴 Rag Preview generatePreview error:", error);
-      setPreviewChunks([]);
+      console.error("Error generating chunks:", error);
+      toast.error("Failed to generate chunks");
+    } finally {
+      setIsPreviewLoading(false);
     }
   };
 
@@ -320,17 +316,29 @@ export default function RAGResourcesPage() {
                 onClick={handlePreviewChunks}
                 variant="outline"
                 className="flex-1"
+                disabled={isPreviewLoading}
               >
-                <Eye className="w-4 h-4 mr-2" />
-                Preview Chunks
+                {isPreviewLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Generating Preview...
+                  </>
+                ) : (
+                  <>
+                    <Eye className="w-4 h-4 mr-2" />
+                    Preview Chunks
+                  </>
+                )}
               </Button>
             </div>
 
-            {previewChunks.length > 0 && (
+            {(previewChunks.length > 0 || isPreviewLoading) && (
               <RagChunkPreview
                 previewChunks={previewChunks}
                 chunkingStrategy={chunkingStrategy}
                 actualStrategy={actualStrategy}
+                validationIssues={validation?.issues || []}
+                chunkPositions={validation?.chunkPositions || []}
               />
             )}
 
