@@ -6,14 +6,14 @@ export async function POST(req: NextRequest) {
     const { text, chunkingStrategy, chunkSize, chunkOverlap, keywords } =
       await req.json();
 
-    // log the chunking details
-    console.log("🔵 Chunking details:", {
-      text,
-      chunkingStrategy,
-      chunkSize,
-      chunkOverlap,
-      keywords,
-    });
+    // // log the chunking details
+    // console.log("🔵 Chunking details:", {
+    //   text,
+    //   chunkingStrategy,
+    //   chunkSize,
+    //   chunkOverlap,
+    //   keywords,
+    // });
 
     if (!text) {
       return NextResponse.json({ error: "No text provided" }, { status: 400 });

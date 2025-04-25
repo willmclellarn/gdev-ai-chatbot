@@ -28,6 +28,7 @@ export interface FileNode {
   type: "file";
   name: string;
   path: string;
+  size?: number;
 }
 
 export interface FolderNode {

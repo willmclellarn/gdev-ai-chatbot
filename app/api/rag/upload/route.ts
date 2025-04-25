@@ -85,24 +85,24 @@ export async function POST(request: Request) {
     }));
 
     console.log("🔵 Upserting", vectors.length, "vectors to Pinecone...");
-    const upsertResult = await courseMaterialNamespace.upsert(vectors);
-    console.log("✅ Successfully upserted vectors to Pinecone", upsertResult);
+    await courseMaterialNamespace.upsert(vectors);
+    console.log("✅ Successfully upserted vectors to Pinecone");
 
-    // Save file metadata to database
-    console.log("🔵 Saving file metadata to database...");
+    // Create a rag file record in the database
+    console.log("🔵 Creating a rag file record in the database...");
     const [fileRecord] = await db
       .insert(ragFile)
       .values({
         name: documentTitle,
-        path: `pinecone:${documentTitle}`, // Store reference to Pinecone namespace
-        type: "text/plain", // Default type for now
-        size: 0, // Size not relevant for RAG files
+        path: `pinecone:${documentTitle}`,
+        type: "text/plain",
+        size: 0,
         userId: session.user.id,
         vectorId: documentTitle,
-        chunkCount: chunks.length, // Store the number of chunks
+        chunkCount: chunks.length,
       })
       .returning();
-    console.log("✅ File metadata saved to database");
+    console.log("✅ Rag file record created in the database");
 
     return NextResponse.json({
       vectors: vectors.map((vector) => vector.values),

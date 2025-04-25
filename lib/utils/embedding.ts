@@ -8,7 +8,7 @@ export async function embedChunks(
 ) {
   const embedder = openai.embedding(embeddingModel.id);
 
-  console.log("🔵 Embedding chunks:", chunks);
+  // console.log("🔵 Embedding chunks:", chunks);
 
   const embeddingsData = await embedder.doEmbed({
     values: chunks,

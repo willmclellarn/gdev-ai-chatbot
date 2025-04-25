@@ -54,13 +54,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const formData = await request.formData();
-    const file = formData.get("file") as File;
-    const name = formData.get("name") as string;
-    const type = formData.get("type") as string;
-    const vectorId = formData.get("vectorId") as string;
+    const { name, type, documentTitle } = await request.json();
 
-    if (!file || !name || !type || !vectorId) {
+    if (!name || !type || !documentTitle) {
       return NextResponse.json(
         { error: "Missing required fields" },
         { status: 400 }
@@ -71,12 +67,12 @@ export async function POST(request: Request) {
     const [fileRecord] = await db
       .insert(ragFile)
       .values({
-        name,
-        path: `pinecone:${vectorId}`, // Store reference to Pinecone namespace
+        name: documentTitle,
+        path: `pinecone:${documentTitle}`,
         type,
-        size: file.size,
+        size: 0,
         userId: session.user.id,
-        vectorId,
+        vectorId: documentTitle,
       })
       .returning();
 

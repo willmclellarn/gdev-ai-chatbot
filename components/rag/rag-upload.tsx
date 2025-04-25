@@ -85,42 +85,21 @@ export function RagUpload({
       uploadBody.append("documentTitle", documentTitle);
       uploadBody.append("originalFileName", file.name);
 
-      const { vectors, pineconeDocumentTitle } = await fetch(
-        "/api/rag/upload",
-        {
-          method: "POST",
-          body: uploadBody,
-        }
-      ).then((res) => res.json());
+      const result = await fetch("/api/rag/upload", {
+        method: "POST",
+        body: uploadBody,
+      }).then((res) => res.json());
 
-      if (!vectors || !pineconeDocumentTitle) {
+      if (!result.vectors || !result.documentTitle) {
         console.error("🔴 RAG Upload error:", {
-          vectors,
-          pineconeDocumentTitle,
+          vectors: result.vectors,
+          pineconeDocumentTitle: result.documentTitle,
         });
         toast.error("Failed to upload chunks to Pinecone");
         return;
       }
 
       toast.success("Chunks uploaded to Pinecone successfully");
-
-      const fileSaveResult = await fetch("/api/rag/files", {
-        method: "POST",
-        body: JSON.stringify({
-          name: documentTitle,
-          type: file.type,
-          documentTitle,
-        }),
-      });
-
-      if (!fileSaveResult.ok) {
-        const errorText = await fileSaveResult.text();
-        console.error("🔴 RAG File save error:", errorText);
-        toast.error("Failed to save file information");
-        return;
-      }
-
-      toast.success("File saved in RAG file directory successfully");
 
       setShowTitleDialog(false);
       setDocumentTitle("");

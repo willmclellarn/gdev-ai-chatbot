@@ -50,7 +50,14 @@ export function RagSidebar({ children }: RagSidebarProps) {
         }
         const foldersData = await foldersResponse.json();
 
-        // Transform folders into TreeNode structure
+        // Fetch files
+        const filesResponse = await fetch("/api/rag/files");
+        if (!filesResponse.ok) {
+          throw new Error("Failed to fetch files");
+        }
+        const filesData = await filesResponse.json();
+
+        // Transform folders and files into TreeNode structure
         const transformedStructure: TreeNode[] = [];
 
         // Add personal folders
@@ -79,10 +86,36 @@ export function RagSidebar({ children }: RagSidebarProps) {
           });
         }
 
+        // Add personal files
+        if (filesData.personalFiles) {
+          filesData.personalFiles.forEach((file: any) => {
+            const fileNode: FileNode = {
+              type: "file",
+              name: file.name,
+              path: file.path,
+              size: file.size,
+            };
+            transformedStructure.push(fileNode);
+          });
+        }
+
+        // Add organization files
+        if (filesData.organizationFiles) {
+          filesData.organizationFiles.forEach((file: any) => {
+            const fileNode: FileNode = {
+              type: "file",
+              name: file.name,
+              path: file.path,
+              size: file.size,
+            };
+            transformedStructure.push(fileNode);
+          });
+        }
+
         setStructure(transformedStructure);
       } catch (error) {
-        console.error("Error fetching folders:", error);
-        toast.error("Failed to load folders");
+        console.error("Error fetching data:", error);
+        toast.error("Failed to load data");
       } finally {
         setIsLoading(false);
       }
