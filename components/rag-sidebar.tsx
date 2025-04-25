@@ -23,37 +23,10 @@ import {
 } from "./rag/rag-folder-structure";
 import { RagIndexManager } from "./rag/rag-index-manager";
 import { RagFileManager } from "./rag/rag-file-manager";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { DndProvider } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
-
-// Example folder structure data
-const exampleStructure: TreeNode[] = [
-  {
-    type: "folder" as const,
-    name: "Documents",
-    isOpen: true,
-    children: [
-      {
-        type: "file" as const,
-        name: "example.txt",
-        path: "/documents/example.txt",
-      },
-      {
-        type: "folder" as const,
-        name: "Reports",
-        isOpen: false,
-        children: [
-          {
-            type: "file" as const,
-            name: "report1.pdf",
-            path: "/documents/reports/report1.pdf",
-          },
-        ],
-      },
-    ],
-  },
-];
+import { toast } from "sonner";
 
 interface RagSidebarProps {
   children?: React.ReactNode;
@@ -63,7 +36,60 @@ export function RagSidebar({ children }: RagSidebarProps) {
   const router = useRouter();
   const { setOpenMobile } = useSidebar();
   const [activeTab, setActiveTab] = useState<"files" | "index">("files");
-  const [structure, setStructure] = useState<TreeNode[]>(exampleStructure);
+  const [structure, setStructure] = useState<TreeNode[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Fetch folders and files when component mounts
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        // Fetch folders
+        const foldersResponse = await fetch("/api/rag/folders");
+        if (!foldersResponse.ok) {
+          throw new Error("Failed to fetch folders");
+        }
+        const foldersData = await foldersResponse.json();
+
+        // Transform folders into TreeNode structure
+        const transformedStructure: TreeNode[] = [];
+
+        // Add personal folders
+        if (foldersData.personalFolders) {
+          foldersData.personalFolders.forEach((folder: any) => {
+            const folderNode: FolderNode = {
+              type: "folder",
+              name: folder.name,
+              children: [],
+              isOpen: false,
+            };
+            transformedStructure.push(folderNode);
+          });
+        }
+
+        // Add organization folders
+        if (foldersData.organizationFolders) {
+          foldersData.organizationFolders.forEach((folder: any) => {
+            const folderNode: FolderNode = {
+              type: "folder",
+              name: folder.name,
+              children: [],
+              isOpen: false,
+            };
+            transformedStructure.push(folderNode);
+          });
+        }
+
+        setStructure(transformedStructure);
+      } catch (error) {
+        console.error("Error fetching folders:", error);
+        toast.error("Failed to load folders");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
 
   const handleFileSelect = (file: FileNode) => {
     console.log("Selected file:", file);
@@ -117,7 +143,11 @@ export function RagSidebar({ children }: RagSidebarProps) {
               </Button>
             </div>
             <div className="flex-1 overflow-auto p-4">
-              {activeTab === "files" ? (
+              {isLoading ? (
+                <div className="flex items-center justify-center h-full">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                </div>
+              ) : activeTab === "files" ? (
                 <DndProvider backend={HTML5Backend}>
                   <div className="flex flex-col gap-4">
                     <RagFileManager

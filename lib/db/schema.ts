@@ -10,6 +10,7 @@ import {
   foreignKey,
   boolean,
   unique,
+  integer,
 } from "drizzle-orm/pg-core";
 
 export const user = pgTable("User", {
@@ -258,3 +259,66 @@ export const organizationPreferences = pgTable("OrganizationPreferences", {
 export type OrganizationPreferences = InferSelectModel<
   typeof organizationPreferences
 >;
+
+export const ragFolder = pgTable("RagFolder", {
+  id: uuid("id").primaryKey().notNull().defaultRandom(),
+  name: varchar("name", { length: 255 }).notNull(),
+  userId: uuid("userId")
+    .notNull()
+    .references(() => user.id),
+  organizationId: uuid("organizationId").references(() => organization.id),
+  createdAt: timestamp("createdAt").notNull().defaultNow(),
+  updatedAt: timestamp("updatedAt").notNull().defaultNow(),
+});
+
+export const ragFile = pgTable("RagFile", {
+  id: uuid("id").primaryKey().notNull().defaultRandom(),
+  name: varchar("name", { length: 255 }).notNull(),
+  path: text("path").notNull(),
+  type: varchar("type", { length: 50 }).notNull(),
+  size: integer("size").notNull(),
+  userId: uuid("userId")
+    .notNull()
+    .references(() => user.id),
+  folderId: uuid("folderId").references(() => ragFolder.id),
+  organizationId: uuid("organizationId").references(() => organization.id),
+  createdAt: timestamp("createdAt").notNull().defaultNow(),
+  updatedAt: timestamp("updatedAt").notNull().defaultNow(),
+});
+
+export type RagFolder = InferSelectModel<typeof ragFolder>;
+export type RagFile = InferSelectModel<typeof ragFile>;
+
+export const ragIndex = pgTable("RagIndex", {
+  id: uuid("id").primaryKey().notNull().defaultRandom(),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  userId: uuid("userId")
+    .notNull()
+    .references(() => user.id),
+  organizationId: uuid("organizationId").references(() => organization.id),
+  createdAt: timestamp("createdAt").notNull().defaultNow(),
+  updatedAt: timestamp("updatedAt").notNull().defaultNow(),
+});
+
+export type RagIndex = InferSelectModel<typeof ragIndex>;
+
+export const ragIndexFile = pgTable(
+  "RagIndexFile",
+  {
+    indexId: uuid("indexId")
+      .notNull()
+      .references(() => ragIndex.id),
+    fileId: uuid("fileId")
+      .notNull()
+      .references(() => ragFile.id),
+    createdAt: timestamp("createdAt").notNull().defaultNow(),
+  },
+  (table) => {
+    return {
+      pk: primaryKey({ columns: [table.indexId, table.fileId] }),
+    };
+  }
+);
+
+export type RagIndexFile = InferSelectModel<typeof ragIndexFile>;

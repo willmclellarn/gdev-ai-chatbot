@@ -94,23 +94,46 @@ export function RagFileManager({
     disabled: isUploading,
   });
 
-  const createNewFolder = () => {
+  const createNewFolder = async () => {
     if (!newFolderName.trim()) {
       toast.error("Please enter a folder name");
       return;
     }
 
-    const newFolder: FolderNode = {
-      type: "folder",
-      name: newFolderName.trim(),
-      children: [],
-      isOpen: true,
-    };
+    try {
+      // Make API call to create folder in database
+      const response = await fetch("/api/rag/folders", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: newFolderName.trim(),
+        }),
+      });
 
-    onStructureChange([...structure, newFolder]);
-    setShowNewFolderDialog(false);
-    setNewFolderName("");
-    toast.success("Folder created successfully");
+      if (!response.ok) {
+        throw new Error("Failed to create folder");
+      }
+
+      const folderData = await response.json();
+
+      // Create folder node with the data from the server
+      const newFolder: FolderNode = {
+        type: "folder",
+        name: folderData.name,
+        children: [],
+        isOpen: true,
+      };
+
+      onStructureChange([...structure, newFolder]);
+      setShowNewFolderDialog(false);
+      setNewFolderName("");
+      toast.success("Folder created successfully");
+    } catch (error) {
+      console.error("Error creating folder:", error);
+      toast.error("Failed to create folder");
+    }
   };
 
   const renameNode = () => {
