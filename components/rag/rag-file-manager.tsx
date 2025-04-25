@@ -177,19 +177,10 @@ export function RagFileManager({
             <FolderPlus className="h-4 w-4 mr-2" />
             New Folder
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => document.getElementById("file-upload")?.click()}
-            disabled={isUploading}
-          >
-            <FilePlus className="h-4 w-4 mr-2" />
-            Upload File
-          </Button>
         </div>
       </div>
 
-      <div
+      {/* <div
         {...getRootProps()}
         className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
           isDragActive
@@ -208,7 +199,7 @@ export function RagFileManager({
           Supported formats: PDF, Word (.doc, .docx), Text (.txt), Markdown
           (.md)
         </p>
-      </div>
+      </div> */}
 
       <Dialog open={showNewFolderDialog} onOpenChange={setShowNewFolderDialog}>
         <DialogContent>
