@@ -67,6 +67,9 @@ export function RagFolderStructure({
   onRefresh,
 }: RagFolderStructureProps) {
   const [structure, setStructure] = useState<TreeNode[]>(initialStructure);
+  const [loadingStates, setLoadingStates] = useState<
+    Record<string, "renaming" | "deleting" | null>
+  >({});
 
   // Sync structure with initialStructure when it changes
   useEffect(() => {
@@ -291,6 +294,9 @@ export function RagFolderStructure({
 
   const deleteNode = async (node: TreeNode, parentPath: string[]) => {
     try {
+      // Set loading state for this node
+      setLoadingStates((prev) => ({ ...prev, [node.id]: "deleting" }));
+
       // Check if node has an ID first
       if (!node.id) {
         throw new Error(`${node.type} ID is missing`);
@@ -363,6 +369,68 @@ export function RagFolderStructure({
     } catch (error) {
       console.error(`Error deleting ${node.type}:`, error);
       toast.error(`Failed to delete ${node.type}`);
+    } finally {
+      // Clear loading state
+      setLoadingStates((prev) => ({ ...prev, [node.id]: null }));
+    }
+  };
+
+  const handleRename = async (node: TreeNode, newName: string) => {
+    try {
+      // Set loading state for this node
+      setLoadingStates((prev) => ({ ...prev, [node.id]: "renaming" }));
+
+      if (!node.id) {
+        throw new Error(`${node.type} ID is missing`);
+      }
+
+      const endpoint =
+        node.type === "file" ? "/api/rag/files" : "/api/rag/folders";
+      const response = await fetch(endpoint, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          id: node.id,
+          name: newName,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `Failed to rename ${node.type}`);
+      }
+
+      // Update local structure
+      const updateStructure = (nodes: TreeNode[]): TreeNode[] => {
+        return nodes.map((n) => {
+          if (n.id === node.id) {
+            return { ...n, name: newName };
+          }
+          if (n.type === "folder") {
+            return {
+              ...n,
+              children: updateStructure(n.children),
+            };
+          }
+          return n;
+        });
+      };
+
+      const newStructure = updateStructure(structure);
+      setStructure(newStructure);
+      onStructureChange?.(newStructure);
+
+      toast.success(
+        `${node.type === "file" ? "File" : "Folder"} renamed successfully`
+      );
+    } catch (error) {
+      console.error(`Error renaming ${node.type}:`, error);
+      toast.error(`Failed to rename ${node.type}`);
+    } finally {
+      // Clear loading state
+      setLoadingStates((prev) => ({ ...prev, [node.id]: null }));
     }
   };
 
@@ -386,6 +454,7 @@ export function RagFolderStructure({
           ? ChevronDownIcon
           : ChevronRightIcon;
       const currentPath = [...parentPath, node.name];
+      const isLoading = loadingStates[node.id];
 
       const [{ isDragging }, drag] = useDrag(
         () => ({
@@ -431,7 +500,8 @@ export function RagFolderStructure({
             ref={ref}
             className={cn(
               "flex items-center gap-2 px-2 py-1 hover:bg-accent/50 rounded-md cursor-pointer group",
-              "transition-colors duration-200"
+              "transition-colors duration-200",
+              isLoading && "opacity-50 pointer-events-none"
             )}
             style={{ paddingLeft: `${depth * 16 + 8}px` }}
             onClick={() => {
@@ -445,11 +515,18 @@ export function RagFolderStructure({
           >
             <GripVerticalIcon
               className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 cursor-grab active:cursor-grabbing"
-              onMouseDown={(e) => e.stopPropagation()} // Prevent click event when dragging
+              onMouseDown={(e) => e.stopPropagation()}
             />
             {isFolder && <Chevron className="h-4 w-4 text-muted-foreground" />}
             <Icon className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm flex-1">{node.name}</span>
+            <span className="text-sm flex-1">
+              {node.name}
+              {isLoading && (
+                <span className="ml-2 text-xs text-muted-foreground">
+                  {isLoading === "renaming" ? "Renaming..." : "Deleting..."}
+                </span>
+              )}
+            </span>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
@@ -457,20 +534,35 @@ export function RagFolderStructure({
                   size="sm"
                   className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100"
                   onClick={(e) => e.stopPropagation()}
+                  disabled={!!isLoading}
                 >
                   <MoreVerticalIcon className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={(e) => e.stopPropagation()}>
+                <DropdownMenuItem
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const newName = prompt(`Enter new name for ${node.name}:`);
+                    if (newName && newName !== node.name) {
+                      handleRename(node, newName);
+                    }
+                  }}
+                  disabled={!!isLoading}
+                >
                   Rename
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={(e) => {
                     e.stopPropagation();
-                    deleteNode(node, currentPath);
+                    if (
+                      confirm(`Are you sure you want to delete ${node.name}?`)
+                    ) {
+                      deleteNode(node, currentPath);
+                    }
                   }}
                   className="text-destructive"
+                  disabled={!!isLoading}
                 >
                   Delete
                 </DropdownMenuItem>
@@ -492,7 +584,14 @@ export function RagFolderStructure({
         </div>
       );
     },
-    [moveNode, onFileSelect, onFolderSelect, toggleFolder, deleteNode]
+    [
+      moveNode,
+      onFileSelect,
+      onFolderSelect,
+      toggleFolder,
+      deleteNode,
+      loadingStates,
+    ]
   );
 
   const renderNode = useCallback(

@@ -333,13 +333,23 @@ export default function RAGResourcesPage() {
             </div>
 
             {(previewChunks.length > 0 || isPreviewLoading) && (
-              <RagChunkPreview
-                previewChunks={previewChunks}
-                chunkingStrategy={chunkingStrategy}
-                actualStrategy={actualStrategy}
-                validationIssues={validation?.issues || []}
-                chunkPositions={validation?.chunkPositions || []}
-              />
+              <>
+                {(() => {
+                  console.log("🔵 RAGResourcesPage validation data:", {
+                    validation,
+                    previewChunksLength: previewChunks.length,
+                    isPreviewLoading,
+                  });
+                  return null;
+                })()}
+                <RagChunkPreview
+                  previewChunks={previewChunks}
+                  chunkingStrategy={chunkingStrategy}
+                  actualStrategy={actualStrategy}
+                  validationIssues={validation?.issues || []}
+                  chunkPositions={validation?.chunkPositions || []}
+                />
+              </>
             )}
 
             <RagUpload

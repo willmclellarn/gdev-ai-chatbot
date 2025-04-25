@@ -39,21 +39,17 @@ export async function GET() {
 }
 
 export async function DELETE(request: Request) {
+  console.log("🔵 [RAG] Delete vectors route hit");
   try {
     const { documentIds, documentTitle } = await request.json();
 
-    // Validate input - must have either documentIds or documentTitle
-    if ((!documentIds || !Array.isArray(documentIds)) && !documentTitle) {
-      return NextResponse.json(
-        { error: "Must provide either documentIds array or documentTitle" },
-        { status: 400 }
-      );
-    }
-
     const courseMaterialNamespace = pinecone.namespace("course-material");
 
-    // If documentTitle is provided, find the corresponding document
+    // If documentTitle is provided, delete by title
     if (documentTitle) {
+      console.log("🔵 [RAG] Deleting document by title:", documentTitle);
+
+      // Get document details to construct vector IDs
       const documentDetails = await db
         .select({
           vectorId: ragFile.vectorId,
@@ -62,73 +58,46 @@ export async function DELETE(request: Request) {
         .from(ragFile)
         .where(eq(ragFile.name, documentTitle));
 
-      if (documentDetails.length === 0) {
-        return NextResponse.json(
-          { error: "Document not found" },
-          { status: 404 }
-        );
+      if (documentDetails.length > 0) {
+        const { vectorId, chunkCount } = documentDetails[0];
+
+        if (vectorId) {
+          // Construct and delete vector IDs
+          const vectorIds = Array.from(
+            { length: chunkCount },
+            (_, i) => `${documentTitle}-chunk-${i}`
+          );
+          await courseMaterialNamespace.deleteMany(vectorIds);
+
+          // Delete from database
+          await db.delete(ragFile).where(eq(ragFile.vectorId, vectorId));
+        }
       }
-
-      const { vectorId, chunkCount } = documentDetails[0];
-
-      // Ensure vectorId is a string
-      if (!vectorId) {
-        return NextResponse.json(
-          { error: "Invalid document data" },
-          { status: 400 }
-        );
-      }
-
-      // Construct vector IDs for all chunks of this document
-      const vectorIds = Array.from(
-        { length: chunkCount },
-        (_, i) => `${documentTitle}-chunk-${i}`
-      );
-
-      // Delete vectors from Pinecone
-      await courseMaterialNamespace.deleteMany(vectorIds);
-
-      // Delete the file record from the database
-      await db.delete(ragFile).where(eq(ragFile.vectorId, vectorId));
 
       return NextResponse.json({
         success: true,
-        message: `Deleted document "${documentTitle}" and all associated vectors`,
+        message: `Deleted document "${documentTitle}" if it existed`,
       });
     }
 
-    // If documentIds are provided, handle vector deletion
+    // If documentIds are provided, delete by IDs
     if (documentIds && documentIds.length > 0) {
-      // Get document details for the first ID to verify it exists
-      const documentDetails = await db
-        .select({
-          name: ragFile.name,
-          chunkCount: ragFile.chunkCount,
-        })
-        .from(ragFile)
-        .where(inArray(ragFile.vectorId, documentIds));
+      console.log("🔵 [RAG] Deleting documents by IDs:", documentIds);
 
-      if (documentDetails.length === 0) {
-        return NextResponse.json(
-          { error: "No matching documents found" },
-          { status: 404 }
-        );
-      }
-
-      // Delete vectors from Pinecone
+      // Delete from Pinecone
       await courseMaterialNamespace.deleteMany(documentIds);
 
-      // Delete the file records from the database
+      // Delete from database
       await db.delete(ragFile).where(inArray(ragFile.vectorId, documentIds));
 
       return NextResponse.json({
         success: true,
-        message: `Deleted ${documentIds.length} vectors and associated documents`,
+        message: `Deleted ${documentIds.length} vectors if they existed`,
       });
     }
 
     return NextResponse.json(
-      { error: "Invalid request parameters" },
+      { error: "No document IDs or title provided" },
       { status: 400 }
     );
   } catch (error) {

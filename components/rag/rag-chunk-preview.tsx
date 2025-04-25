@@ -23,6 +23,13 @@ export function RagChunkPreview({
   chunkPositions = [],
   isPreviewLoading = false,
 }: RagChunkPreviewProps) {
+  console.log("🔵 RagChunkPreview props:", {
+    validationIssues,
+    chunkPositions,
+    isPreviewLoading,
+    previewChunksLength: previewChunks.length,
+  });
+
   return (
     <div className="space-y-4">
       <div className="space-y-2">

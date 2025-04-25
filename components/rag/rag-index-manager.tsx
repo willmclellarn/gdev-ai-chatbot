@@ -30,21 +30,30 @@ export function RagIndexManager({ onRefresh }: RagIndexManagerProps) {
   const [selectedDocuments, setSelectedDocuments] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [totalVectors, setTotalVectors] = useState(0);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const fetchDocuments = async () => {
+    console.log("🟡 [RAG] Fetching documents...");
     try {
       setIsLoading(true);
+      setIsRefreshing(true);
       const response = await fetch("/api/rag/vectors");
       if (!response.ok) throw new Error("Failed to fetch documents");
 
       const data = await response.json();
+      console.log(
+        "🟡 [RAG] Documents fetched successfully:",
+        data.documents.length
+      );
       setDocuments(data.documents);
       setTotalVectors(data.totalVectors);
     } catch (error) {
-      console.error("Error fetching documents:", error);
+      console.error("🟡 [RAG] Error fetching documents:", error);
       toast.error("Failed to load indexed documents");
     } finally {
       setIsLoading(false);
+      setIsRefreshing(false);
     }
   };
 
@@ -58,38 +67,38 @@ export function RagIndexManager({ onRefresh }: RagIndexManagerProps) {
       return;
     }
 
+    console.log("🟡 [RAG] Deleting documents:", selectedDocuments);
     try {
-      // First, get the vector IDs for the selected documents
-      const response = await fetch("/api/rag/vectors");
-      if (!response.ok) throw new Error("Failed to fetch documents");
+      setIsDeleting(true);
 
-      const data = await response.json();
-      const selectedVectors = data.documents.filter((doc: any) =>
-        selectedDocuments.includes(doc.id)
-      );
-      const vectorIds = selectedVectors.map((doc: any) => doc.vectorId);
-
-      // Delete vectors and associated files
+      // Delete vectors and associated files in a single request
       const deleteResponse = await fetch("/api/rag/vectors", {
         method: "DELETE",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ documentIds: vectorIds }),
+        body: JSON.stringify({ documentIds: selectedDocuments }),
       });
 
-      if (!deleteResponse.ok) throw new Error("Failed to delete documents");
+      if (!deleteResponse.ok) {
+        const errorData = await deleteResponse.json();
+        throw new Error(errorData.error || "Failed to delete documents");
+      }
 
+      console.log("🟡 [RAG] Documents deleted successfully");
       toast.success("Documents deleted successfully");
       setSelectedDocuments([]);
 
       // Refresh the structure after successful deletion
       await onRefresh?.();
-
       fetchDocuments();
     } catch (error) {
-      console.error("Error deleting documents:", error);
-      toast.error("Failed to delete documents");
+      console.error("🟡 [RAG] Error deleting documents:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Failed to delete documents"
+      );
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -118,19 +127,23 @@ export function RagIndexManager({ onRefresh }: RagIndexManagerProps) {
             variant="outline"
             size="sm"
             onClick={fetchDocuments}
-            disabled={isLoading}
+            disabled={isLoading || isRefreshing}
           >
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Refresh
+            <RefreshCw
+              className={`h-4 w-4 mr-2 ${isRefreshing ? "animate-spin" : ""}`}
+            />
+            {isRefreshing ? "Refreshing..." : "Refresh"}
           </Button>
           <Button
             variant="destructive"
             size="sm"
             onClick={handleDelete}
-            disabled={selectedDocuments.length === 0}
+            disabled={selectedDocuments.length === 0 || isDeleting}
           >
-            <Trash2 className="h-4 w-4 mr-2" />
-            Delete Selected
+            <Trash2
+              className={`h-4 w-4 mr-2 ${isDeleting ? "animate-pulse" : ""}`}
+            />
+            {isDeleting ? "Deleting..." : "Delete Selected"}
           </Button>
         </div>
       </div>

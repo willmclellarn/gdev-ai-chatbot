@@ -41,7 +41,10 @@ export function validateChunkBeginningsExist(
     const startIndex = documentText.indexOf(chunkBeginning);
 
     if (startIndex === -1) {
-      issues.push(`Chunk ${i + 1} not found in original document`);
+      issues.push(
+        `Chunk ${i + 1} not found in original document, startIndex: ${startIndex}, chunkBeginning: ${chunkBeginning}
+        )}`
+      );
       continue;
     }
 
@@ -117,7 +120,7 @@ export async function splitByGeminiGenius(
   // Extract full chunks using the validated positions
   const fullChunks = validation.isValid
     ? extractFullChunks(documentText, validation.chunkPositions)
-    : [];
+    : ["No chunks could be extracted due to validation issues"];
 
   if (!validation.isValid) {
     console.warn(
