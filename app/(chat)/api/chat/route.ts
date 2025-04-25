@@ -4,33 +4,33 @@ import {
   createDataStreamResponse,
   smoothStream,
   streamText,
-} from 'ai';
-import { auth } from '@/app/(auth)/auth';
-import { systemPrompt } from '@/lib/ai/prompts';
+} from "ai";
+import { auth } from "@/app/(auth)/auth";
+import { systemPrompt } from "@/lib/ai/prompts";
 import {
   deleteChatById,
   getChatById,
   saveChat,
   saveMessages,
-} from '@/lib/db/queries';
+} from "@/lib/db/queries";
 import {
   generateUUID,
   getMostRecentUserMessage,
   getTrailingMessageId,
-} from '@/lib/utils';
-import { generateTitleFromUserMessage } from '../../actions';
-import { createDocument } from '@/lib/ai/tools/create-document';
-import { updateDocument } from '@/lib/ai/tools/update-document';
-import { requestSuggestions } from '@/lib/ai/tools/request-suggestions';
-import { getWeather } from '@/lib/ai/tools/get-weather';
-import { isProductionEnvironment } from '@/lib/constants';
-import { myProvider } from '@/lib/ai/providers';
-import { performRAGSearch } from '@/lib/utils/rag';
+} from "@/lib/utils";
+import { generateTitleFromUserMessage } from "../../actions";
+import { createDocument } from "@/lib/ai/tools/create-document";
+import { updateDocument } from "@/lib/ai/tools/update-document";
+import { requestSuggestions } from "@/lib/ai/tools/request-suggestions";
+import { getWeather } from "@/lib/ai/tools/get-weather";
+import { isProductionEnvironment } from "@/lib/constants";
+import { myProvider } from "@/lib/ai/providers";
+import { performRAGSearch } from "@/lib/utils/rag";
 
 export const maxDuration = 60;
 
 export async function POST(request: Request) {
-  console.log('🔵 [Chat API] POST request received');
+  console.log("🔵 [Chat API] POST request received");
   try {
     const {
       id,
@@ -44,46 +44,60 @@ export async function POST(request: Request) {
       embeddingModel: string;
     } = await request.json();
 
-    console.log(`🔵 [Chat API] Processing chat with ID: ${id}, model: ${myProvider.languageModel(selectedChatModel).modelId}`);
+    console.log(
+      `🔵 [Chat API] Processing chat with ID: ${id}, model: ${myProvider.languageModel(selectedChatModel).modelId}`
+    );
 
     const session = await auth();
 
     if (!session || !session.user || !session.user.id) {
-      console.error('🔵 [Chat API] Unauthorized: No valid session found');
-      return new Response('Unauthorized', { status: 401 });
+      console.error("🔵 [Chat API] Unauthorized: No valid session found");
+      return new Response("Unauthorized", { status: 401 });
     }
 
     const userMessage = getMostRecentUserMessage(messages);
 
     if (!userMessage) {
-      console.error('🔵 [Chat API] No user message found in request');
-      return new Response('No user message found', { status: 400 });
+      console.error("🔵 [Chat API] No user message found in request");
+      return new Response("No user message found", { status: 400 });
     }
 
     // Perform vector search for RAG
-    let context = '';
+    let context = "";
     try {
       const userMessageText = userMessage.parts
-        .filter((part): part is { type: 'text'; text: string } => part.type === 'text')
-        .map(part => part.text)
-        .join(' ');
+        .filter(
+          (part): part is { type: "text"; text: string } => part.type === "text"
+        )
+        .map((part) => part.text)
+        .join(" ");
 
-      console.log('🔵 [Chat API] Performing vector search for query:', userMessageText);
+      console.log(
+        "🔵 [Chat API] Performing vector search for query:",
+        userMessageText
+      );
 
-      const searchResponse = await performRAGSearch(userMessageText, embeddingModel);
+      const searchResponse = await performRAGSearch(
+        userMessageText,
+        embeddingModel
+      );
 
-      console.log('🔵 [Chat API] Vector search response:', searchResponse);
+      console.log("🔵 [Chat API] Vector search response:", searchResponse);
 
       const { context: searchContext, matches } = searchResponse;
 
       if (searchContext) {
-        console.log('🔵 [Chat API] Found relevant context with', matches?.length || 0, 'matches');
+        console.log(
+          "🔵 [Chat API] Found relevant context with",
+          matches?.length || 0,
+          "matches"
+        );
         context = searchContext;
       } else {
-        console.log('🔵 [Chat API] No relevant context found');
+        console.log("🔵 [Chat API] No relevant context found");
       }
     } catch (error) {
-      console.error('🔵 [Chat API] Error performing vector search:', error);
+      console.error("🔵 [Chat API] Error performing vector search:", error);
       // Continue without context if search fails
     }
 
@@ -99,8 +113,10 @@ export async function POST(request: Request) {
       console.log(`🔵 [Chat API] New chat created with title: ${title}`);
     } else {
       if (chat.userId !== session.user.id) {
-        console.error(`🔵 [Chat API] Unauthorized: User ${session.user.id} does not own chat ${id}`);
-        return new Response('Unauthorized', { status: 401 });
+        console.error(
+          `🔵 [Chat API] Unauthorized: User ${session.user.id} does not own chat ${id}`
+        );
+        return new Response("Unauthorized", { status: 401 });
       }
     }
 
@@ -110,7 +126,7 @@ export async function POST(request: Request) {
         {
           chatId: id,
           id: userMessage.id,
-          role: 'user',
+          role: "user",
           parts: userMessage.parts,
           attachments: userMessage.experimental_attachments ?? [],
           createdAt: new Date(),
@@ -119,32 +135,37 @@ export async function POST(request: Request) {
     });
 
     // log the context
-    console.log('🔵 [Chat API] Context:', context);
+    console.log("🔵 [Chat API] Context:", context);
 
     // log the selectedChatModel
-    console.log('🔵 [Chat API] Selected chat model:', selectedChatModel);
+    console.log("🔵 [Chat API] Selected chat model:", selectedChatModel);
 
     // log the system prompt
-    console.log('🔵 [Chat API] System prompt:', systemPrompt({ selectedChatModel, context }));
+    console.log(
+      "🔵 [Chat API] System prompt:",
+      systemPrompt({ selectedChatModel, context })
+    );
 
     return createDataStreamResponse({
       execute: (dataStream) => {
-        console.log(`🔵 [Chat API] Starting stream for chat ${id} with model: ${myProvider.languageModel(selectedChatModel).modelId}`);
+        console.log(
+          `🔵 [Chat API] Starting stream for chat ${id} with model: ${myProvider.languageModel(selectedChatModel).modelId}`
+        );
         const result = streamText({
           model: myProvider.languageModel(selectedChatModel),
           system: systemPrompt({ selectedChatModel, context }),
           messages,
           maxSteps: 5,
           experimental_activeTools:
-            selectedChatModel === 'chat-model-reasoning'
+            selectedChatModel === "chat-model-reasoning"
               ? []
               : [
-                  'getWeather',
-                  'createDocument',
-                  'updateDocument',
-                  'requestSuggestions',
+                  "getWeather",
+                  "createDocument",
+                  "updateDocument",
+                  "requestSuggestions",
                 ],
-          experimental_transform: smoothStream({ chunking: 'word' }),
+          experimental_transform: smoothStream({ chunking: "word" }),
           experimental_generateMessageId: generateUUID,
           tools: {
             getWeather,
@@ -160,13 +181,15 @@ export async function POST(request: Request) {
               try {
                 const assistantId = getTrailingMessageId({
                   messages: response.messages.filter(
-                    (message) => message.role === 'assistant',
+                    (message) => message.role === "assistant"
                   ),
                 });
 
                 if (!assistantId) {
-                  console.error('🔵 [Chat API] No assistant message found in response');
-                  throw new Error('No assistant message found!');
+                  console.error(
+                    "🔵 [Chat API] No assistant message found in response"
+                  );
+                  throw new Error("No assistant message found!");
                 }
 
                 const [, assistantMessage] = appendResponseMessages({
@@ -174,7 +197,9 @@ export async function POST(request: Request) {
                   responseMessages: response.messages,
                 });
 
-                console.log(`🔵 [Chat API] Saving assistant message for chat ${id}`);
+                console.log(
+                  `🔵 [Chat API] Saving assistant message for chat ${id}`
+                );
                 await saveMessages({
                   messages: [
                     {
@@ -188,15 +213,17 @@ export async function POST(request: Request) {
                     },
                   ],
                 });
-                console.log(`🔵 [Chat API] Successfully saved assistant message for chat ${id}`);
+                console.log(
+                  `🔵 [Chat API] Successfully saved assistant message for chat ${id}`
+                );
               } catch (error) {
-                console.error('🔵 [Chat API] Failed to save chat:', error);
+                console.error("🔵 [Chat API] Failed to save chat:", error);
               }
             }
           },
           experimental_telemetry: {
             isEnabled: isProductionEnvironment,
-            functionId: 'stream-text',
+            functionId: "stream-text",
           },
         });
 
@@ -207,52 +234,56 @@ export async function POST(request: Request) {
         });
       },
       onError: (error) => {
-        console.error('🔵 [Chat API] Stream error:', error);
-        return 'Oops, an error occurred!';
+        console.error("🔵 [Chat API] Stream error:", error);
+        return "Oops, an error occurred!";
       },
     });
   } catch (error) {
-    console.error('🔵 [Chat API] POST request error:', error);
-    return new Response('An error occurred while processing your request!', {
+    console.error("🔵 [Chat API] POST request error:", error);
+    return new Response("An error occurred while processing your request!", {
       status: 404,
     });
   }
 }
 
 export async function DELETE(request: Request) {
-  console.log('🔵 [Chat API] DELETE request received');
+  console.log("🔵 [Chat API] DELETE request received");
   const { searchParams } = new URL(request.url);
-  const id = searchParams.get('id');
+  const id = searchParams.get("id");
 
   if (!id) {
-    console.error('🔵 [Chat API] DELETE request missing chat ID');
-    return new Response('Not Found', { status: 404 });
+    console.error("🔵 [Chat API] DELETE request missing chat ID");
+    return new Response("Not Found", { status: 404 });
   }
 
   console.log(`🔵 [Chat API] Processing delete request for chat ${id}`);
   const session = await auth();
 
   if (!session || !session.user) {
-    console.error('🔵 [Chat API] Unauthorized: No valid session found for delete request');
-    return new Response('Unauthorized', { status: 401 });
+    console.error(
+      "🔵 [Chat API] Unauthorized: No valid session found for delete request"
+    );
+    return new Response("Unauthorized", { status: 401 });
   }
 
   try {
     const chat = await getChatById({ id });
 
     if (chat.userId !== session.user.id) {
-      console.error(`🔵 [Chat API] Unauthorized: User ${session.user.id} does not own chat ${id}`);
-      return new Response('Unauthorized', { status: 401 });
+      console.error(
+        `🔵 [Chat API] Unauthorized: User ${session.user.id} does not own chat ${id}`
+      );
+      return new Response("Unauthorized", { status: 401 });
     }
 
     console.log(`🔵 [Chat API] Deleting chat ${id}`);
     await deleteChatById({ id });
     console.log(`🔵 [Chat API] Successfully deleted chat ${id}`);
 
-    return new Response('Chat deleted', { status: 200 });
+    return new Response("Chat deleted", { status: 200 });
   } catch (error) {
     console.error(`🔵 [Chat API] Error deleting chat ${id}:`, error);
-    return new Response('An error occurred while processing your request!', {
+    return new Response("An error occurred while processing your request!", {
       status: 500,
     });
   }

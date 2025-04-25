@@ -27,6 +27,7 @@ interface RagUploadProps {
   keywords: string;
   embeddingModel: EmbeddingModel;
   selectedLocalFile: string;
+  previewChunks?: string[];
 }
 
 export function RagUpload({
@@ -39,6 +40,7 @@ export function RagUpload({
   keywords,
   embeddingModel,
   selectedLocalFile,
+  previewChunks = [],
 }: RagUploadProps) {
   const [showTitleDialog, setShowTitleDialog] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -52,31 +54,38 @@ export function RagUpload({
       }
 
       setIsProcessing(true);
-      const processedFile = await extractPlainTextFromFile(file);
+      let chunks;
 
-      // Generate chunks first
-      const generateChunksResult = await fetch("/api/rag/generate-chunks", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          text: processedFile,
-          chunkingStrategy,
-          chunkSize,
-          chunkOverlap,
-          keywords,
-        }),
-      });
+      // If we have preview chunks, use them instead of regenerating
+      if (previewChunks.length > 0) {
+        chunks = { chunks: previewChunks };
+        toast.success("Using existing chunks from preview");
+      } else {
+        // Generate chunks if no preview available
+        const processedFile = await extractPlainTextFromFile(file);
+        const generateChunksResult = await fetch("/api/rag/generate-chunks", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            text: processedFile,
+            chunkingStrategy,
+            chunkSize,
+            chunkOverlap,
+            keywords,
+          }),
+        });
 
-      if (!generateChunksResult.ok) {
-        const errorText = await generateChunksResult.text();
-        console.error("🔴 RAG Chunking error:", errorText);
-        toast.error("Failed to generate chunks");
-        return;
+        if (!generateChunksResult.ok) {
+          const errorText = await generateChunksResult.text();
+          console.error("🔴 RAG Chunking error:", errorText);
+          toast.error("Failed to generate chunks");
+          return;
+        }
+        chunks = await generateChunksResult.json();
+        toast.success("Chunks generated successfully");
       }
-      const chunks = await generateChunksResult.json();
-      toast.success("Chunks generated successfully");
 
       // Upload file and chunks to Pinecone
       const uploadBody = new FormData();

@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChunkingStrategy } from "@/lib/utils/chunking";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle, CheckCircle2 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface RagChunkPreviewProps {
   previewChunks: string[];
@@ -69,15 +70,17 @@ export function RagChunkPreview({
         <Alert variant="destructive" className="mt-4">
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
-            <div className="space-y-1">
+            <div className="space-y-4">
               <p className="font-medium">Chunking Validation Issues:</p>
-              <ul className="list-disc list-inside space-y-1">
+              <div className="space-y-4">
                 {validationIssues.map((issue, index) => (
-                  <li key={index} className="text-sm">
-                    {issue}
-                  </li>
+                  <div
+                    key={index}
+                    className="text-sm"
+                    dangerouslySetInnerHTML={{ __html: issue }}
+                  />
                 ))}
-              </ul>
+              </div>
             </div>
           </AlertDescription>
         </Alert>
@@ -92,6 +95,33 @@ export function RagChunkPreview({
           </AlertDescription>
         </Alert>
       ) : null}
+
+      <style jsx global>{`
+        .validation-issue {
+          padding: 0.5rem;
+          border-radius: 0.375rem;
+          background-color: rgba(239, 68, 68, 0.1);
+          margin-bottom: 0.5rem;
+        }
+        .validation-issue:last-child {
+          margin-bottom: 0;
+        }
+        .issue-header {
+          font-weight: 500;
+          margin-bottom: 0.5rem;
+          color: rgb(239, 68, 68);
+        }
+        .issue-details {
+          padding-left: 1rem;
+          display: flex;
+          flex-direction: column;
+          gap: 0.25rem;
+        }
+        .issue-details strong {
+          color: rgb(239, 68, 68);
+          opacity: 0.8;
+        }
+      `}</style>
     </div>
   );
 }

@@ -362,6 +362,7 @@ export default function RAGResourcesPage() {
               keywords={keywords}
               embeddingModel={embeddingModel}
               selectedLocalFile={selectedLocalFile}
+              previewChunks={previewChunks}
             />
           </CardContent>
         </Card>
