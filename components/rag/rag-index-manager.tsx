@@ -30,7 +30,7 @@ export function RagIndexManager() {
   const fetchDocuments = async () => {
     try {
       setIsLoading(true);
-      const response = await fetch("/api/rag/index");
+      const response = await fetch("/api/rag/vectors");
       if (!response.ok) throw new Error("Failed to fetch documents");
 
       const data = await response.json();
@@ -55,7 +55,7 @@ export function RagIndexManager() {
     }
 
     try {
-      const response = await fetch("/api/rag/index", {
+      const response = await fetch("/api/rag/vectors", {
         method: "DELETE",
         headers: {
           "Content-Type": "application/json",
