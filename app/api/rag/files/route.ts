@@ -3,7 +3,6 @@ import { auth } from "@/app/(auth)/auth";
 import { db } from "@/lib/db";
 import { ragFile, ragFolder } from "@/lib/db/schema";
 import { eq, inArray, and, isNull } from "drizzle-orm";
-import { put } from "@vercel/blob";
 
 // GET /api/rag/files - Get all files for the current user and their organizations
 export async function GET() {
@@ -57,86 +56,27 @@ export async function POST(request: Request) {
 
     const formData = await request.formData();
     const file = formData.get("file") as File;
-    const folderId = formData.get("folderId") as string;
-    const organizationId = formData.get("organizationId") as string;
+    const name = formData.get("name") as string;
+    const type = formData.get("type") as string;
+    const vectorId = formData.get("vectorId") as string;
 
-    if (!file) {
-      return NextResponse.json({ error: "No file provided" }, { status: 400 });
-    }
-
-    // Validate file type
-    const allowedTypes = [
-      "application/pdf",
-      "application/msword",
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-      "text/plain",
-      "text/markdown",
-    ];
-
-    if (!allowedTypes.includes(file.type)) {
+    if (!file || !name || !type || !vectorId) {
       return NextResponse.json(
-        { error: "File type not supported" },
+        { error: "Missing required fields" },
         { status: 400 }
       );
     }
-
-    // Validate file size (10MB limit)
-    if (file.size > 10 * 1024 * 1024) {
-      return NextResponse.json(
-        { error: "File size exceeds 10MB limit" },
-        { status: 400 }
-      );
-    }
-
-    // Validate folder access if folderId is provided
-    if (folderId) {
-      const [folder] = await db
-        .select()
-        .from(ragFolder)
-        .where(eq(ragFolder.id, folderId));
-
-      if (!folder) {
-        return NextResponse.json(
-          { error: "Folder not found" },
-          { status: 404 }
-        );
-      }
-
-      if (folder.userId !== session.user.id && !folder.organizationId) {
-        return NextResponse.json(
-          { error: "Unauthorized to add file to this folder" },
-          { status: 403 }
-        );
-      }
-    }
-
-    // Validate organization access if organizationId is provided
-    if (organizationId) {
-      const hasAccess = session.user.orgIds?.includes(organizationId);
-      if (!hasAccess) {
-        return NextResponse.json(
-          { error: "Unauthorized to add file to this organization" },
-          { status: 403 }
-        );
-      }
-    }
-
-    // Upload file to blob storage
-    const blob = await put(`rag/${file.name}`, file, {
-      access: "public",
-    });
 
     // Create file record in database
     const [fileRecord] = await db
       .insert(ragFile)
       .values({
-        name: file.name,
-        path: blob.url,
-        type: file.type,
+        name,
+        path: `pinecone:${vectorId}`, // Store reference to Pinecone namespace
+        type,
         size: file.size,
         userId: session.user.id,
-        folderId: folderId || null,
-        organizationId: organizationId || null,
+        vectorId,
       })
       .returning();
 
@@ -145,6 +85,36 @@ export async function POST(request: Request) {
     console.error("Error creating file:", error);
     return NextResponse.json(
       { error: "Failed to create file" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const session = await auth();
+
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { fileId } = await request.json();
+
+    if (!fileId) {
+      return NextResponse.json(
+        { error: "File ID is required" },
+        { status: 400 }
+      );
+    }
+
+    // Delete file record from database
+    await db.delete(ragFile).where(eq(ragFile.id, fileId));
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Error deleting file:", error);
+    return NextResponse.json(
+      { error: "Failed to delete file" },
       { status: 500 }
     );
   }

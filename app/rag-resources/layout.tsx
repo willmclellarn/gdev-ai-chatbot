@@ -22,7 +22,9 @@ export default async function Layout({
       />
       <SidebarProvider defaultOpen={!isCollapsed}>
         <RagSidebar>
-          <main className="flex-1 overflow-auto py-2 px-6">{children}</main>
+          <main className="min-w-[800px] flex-1 overflow-auto py-2 px-6 ">
+            {children}
+          </main>
         </RagSidebar>
       </SidebarProvider>
     </>

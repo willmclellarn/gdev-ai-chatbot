@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
 import { pinecone } from "@/lib/pinecone/pinecone";
+import { db } from "@/lib/db";
+import { ragFile } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 
 export async function GET() {
   try {
@@ -47,16 +50,43 @@ export async function DELETE(request: Request) {
     }
 
     const courseMaterialNamespace = pinecone.namespace("course-material");
-    await courseMaterialNamespace.deleteMany(documentIds);
 
-    return NextResponse.json({
-      success: true,
-      message: "Documents deleted successfully",
-    });
+    // Get the document details to construct proper vector IDs
+    const documentDetails = await db
+      .select({
+        name: ragFile.name,
+        chunkCount: ragFile.chunkCount,
+      })
+      .from(ragFile)
+      .where(eq(ragFile.vectorId, documentIds[0]));
+
+    if (documentDetails.length === 0) {
+      return NextResponse.json(
+        { error: "Document not found" },
+        { status: 404 }
+      );
+    }
+
+    const documentTitle = documentDetails[0].name;
+    const chunkCount = documentDetails[0].chunkCount;
+
+    // Construct vector IDs in the format used during upload
+    const vectorIds = Array.from(
+      { length: chunkCount },
+      (_, i) => `${documentTitle}-chunk-${i}`
+    );
+
+    // Delete vectors from Pinecone
+    await courseMaterialNamespace.deleteMany(vectorIds);
+
+    // Delete the file record from the database
+    await db.delete(ragFile).where(eq(ragFile.vectorId, documentIds[0]));
+
+    return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Error deleting documents:", error);
+    console.error("Error deleting vectors:", error);
     return NextResponse.json(
-      { error: "Failed to delete documents" },
+      { error: "Failed to delete vectors" },
       { status: 500 }
     );
   }

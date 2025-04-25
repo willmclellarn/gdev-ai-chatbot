@@ -275,8 +275,8 @@ export default function RAGResourcesPage() {
         onSaveDefault={handleSaveDefault}
       />
 
-      <div className="container mx-auto px-4 py-8">
-        <Card>
+      <div className="container mx-auto py-8">
+        <Card className="px-6">
           <CardHeader>
             <CardTitle>RAG Resources</CardTitle>
             <CardDescription>

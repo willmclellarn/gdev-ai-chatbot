@@ -282,6 +282,8 @@ export const ragFile = pgTable("RagFile", {
     .references(() => user.id),
   folderId: uuid("folderId").references(() => ragFolder.id),
   organizationId: uuid("organizationId").references(() => organization.id),
+  vectorId: text("vectorId"),
+  chunkCount: integer("chunkCount").notNull().default(0),
   createdAt: timestamp("createdAt").notNull().defaultNow(),
   updatedAt: timestamp("updatedAt").notNull().defaultNow(),
 });

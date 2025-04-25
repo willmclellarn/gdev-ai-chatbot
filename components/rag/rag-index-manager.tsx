@@ -55,15 +55,26 @@ export function RagIndexManager() {
     }
 
     try {
-      const response = await fetch("/api/rag/vectors", {
+      // First, get the vector IDs for the selected documents
+      const response = await fetch("/api/rag/vectors");
+      if (!response.ok) throw new Error("Failed to fetch documents");
+
+      const data = await response.json();
+      const selectedVectors = data.documents.filter((doc: any) =>
+        selectedDocuments.includes(doc.id)
+      );
+      const vectorIds = selectedVectors.map((doc: any) => doc.vectorId);
+
+      // Delete vectors and associated files
+      const deleteResponse = await fetch("/api/rag/vectors", {
         method: "DELETE",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ documentIds: selectedDocuments }),
+        body: JSON.stringify({ documentIds: vectorIds }),
       });
 
-      if (!response.ok) throw new Error("Failed to delete documents");
+      if (!deleteResponse.ok) throw new Error("Failed to delete documents");
 
       toast.success("Documents deleted successfully");
       setSelectedDocuments([]);
