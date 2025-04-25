@@ -103,6 +103,7 @@ export function RagSidebar({ children }: RagSidebarProps) {
             name: file.name,
             path: file.path,
             size: file.size,
+            folderId: file.folderId,
           };
           transformedStructure.push(fileNode);
         });
@@ -117,6 +118,7 @@ export function RagSidebar({ children }: RagSidebarProps) {
             name: file.name,
             path: file.path,
             size: file.size,
+            folderId: file.folderId,
           };
           transformedStructure.push(fileNode);
         });

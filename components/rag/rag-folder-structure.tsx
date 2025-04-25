@@ -7,6 +7,7 @@ import {
   ChevronRightIcon,
   ChevronDownIcon,
   MoreVerticalIcon,
+  GripVerticalIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -31,6 +32,7 @@ export interface FileNode {
   name: string;
   path: string;
   size?: number;
+  folderId?: string | null;
 }
 
 export interface FolderNode {
@@ -65,35 +67,100 @@ export function RagFolderStructure({
   onRefresh,
 }: RagFolderStructureProps) {
   const [structure, setStructure] = useState<TreeNode[]>(initialStructure);
-  const [draggedNode, setDraggedNode] = useState<DraggableItem | null>(null);
 
   // Sync structure with initialStructure when it changes
   useEffect(() => {
-    setStructure(initialStructure);
+    // Filter out files that should be in folders from the root level
+    const organizeStructure = (nodes: TreeNode[]): TreeNode[] => {
+      // First, separate folders and files
+      const folders = nodes.filter(
+        (node): node is FolderNode => node.type === "folder"
+      );
+      const files = nodes.filter(
+        (node): node is FileNode => node.type === "file"
+      );
+
+      console.log("🟡 Organizing structure:", {
+        totalNodes: nodes.length,
+        folders: folders.map((f) => ({
+          id: f.id,
+          name: f.name,
+          childrenCount: f.children.length,
+        })),
+        files: files.map((f) => ({
+          id: f.id,
+          name: f.name,
+          folderId: f.folderId,
+        })),
+      });
+
+      // For each file, check if it belongs in a folder
+      const rootFiles = files.filter((file) => {
+        // If the file has a folderId, it should be in that folder
+        const isInFolder = folders.some((folder) => {
+          const belongsToFolder = file.folderId === folder.id;
+          console.log("🟡 Checking file in folder:", {
+            fileId: file.id,
+            fileName: file.name,
+            fileFolderId: file.folderId,
+            folderId: folder.id,
+            folderName: folder.name,
+            isMatch: belongsToFolder,
+          });
+
+          // If it belongs to this folder, add it to the folder's children
+          if (
+            belongsToFolder &&
+            !folder.children.some((child) => child.id === file.id)
+          ) {
+            folder.children.push(file);
+          }
+          return belongsToFolder;
+        });
+
+        console.log("🟡 File location check:", {
+          fileId: file.id,
+          fileName: file.name,
+          folderId: file.folderId,
+          isInFolder,
+          shouldShowAtRoot: !isInFolder,
+        });
+
+        return !isInFolder;
+      });
+
+      console.log("🟡 After organization:", {
+        rootFiles: rootFiles.map((f) => ({
+          id: f.id,
+          name: f.name,
+          folderId: f.folderId,
+        })),
+        folders: folders.map((f) => ({
+          id: f.id,
+          name: f.name,
+          children: f.children.map((c) => ({
+            id: c.id,
+            name: c.name,
+            folderId: (c as FileNode).folderId,
+          })),
+        })),
+      });
+
+      // Return folders first, then root-level files
+      return [
+        ...folders.map((folder) => ({
+          ...folder,
+          children: organizeStructure(folder.children),
+        })),
+        ...rootFiles,
+      ];
+    };
+
+    setStructure(organizeStructure(initialStructure));
   }, [initialStructure]);
 
-  const [{ isDragging }, drag] = useDrag(() => ({
-    type: "node",
-    item: draggedNode,
-    collect: (monitor: DragSourceMonitor) => ({
-      isDragging: monitor.isDragging(),
-    }),
-  }));
-
-  const [{ isOver }, drop] = useDrop(() => ({
-    accept: "node",
-    drop: (item: DraggableItem) => {
-      if (draggedNode) {
-        moveNode(item.parentPath, draggedNode.parentPath);
-      }
-    },
-    collect: (monitor: DropTargetMonitor) => ({
-      isOver: monitor.isOver(),
-    }),
-  }));
-
   const moveNode = useCallback(
-    (dragPath: string[], dropPath: string[]) => {
+    async (sourcePath: string[], targetPath: string[]) => {
       const findNode = (
         nodes: TreeNode[],
         path: string[]
@@ -115,42 +182,93 @@ export function RagFolderStructure({
         return null;
       };
 
-      const source = findNode(structure, dragPath);
-      const target = findNode(structure, dropPath);
+      try {
+        // Create a deep copy of the structure to avoid mutating the original
+        const newStructure = JSON.parse(JSON.stringify(structure));
 
-      if (!source || !target) return;
+        // Find the source node and its parent
+        const source = findNode(newStructure, sourcePath);
+        if (!source) return;
 
-      // Create a deep copy of the structure to avoid mutating the original
-      const newStructure = JSON.parse(JSON.stringify(structure));
+        // Find the target node and its parent
+        const target = findNode(newStructure, targetPath);
+        if (!target) return;
 
-      // Find the nodes in the new structure
-      const newSource = findNode(newStructure, dragPath);
-      const newTarget = findNode(newStructure, dropPath);
+        // If moving a file into a folder, update the database and open the folder
+        if (source.node.type === "file" && target.node.type === "folder") {
+          console.log("🔵 Moving file to folder:", {
+            fileId: source.node.id,
+            folderId: target.node.id,
+          });
 
-      if (!newSource || !newTarget) return;
+          const response = await fetch("/api/rag/files/move", {
+            method: "PATCH",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              fileId: source.node.id,
+              folderId: target.node.id,
+            }),
+          });
 
-      // Remove from source
-      const sourceIndex = newSource.parent.findIndex(
-        (n) => n === newSource.node
-      );
-      newSource.parent.splice(sourceIndex, 1);
+          if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.message || "Failed to update file location");
+          }
 
-      // Add to target
-      if (newTarget.node.type === "folder") {
-        const targetFolder = newTarget.node as FolderNode;
-        targetFolder.children.push(newSource.node);
-      } else {
-        // If target is a file, add to its parent
-        const targetParent = findNode(newStructure, dropPath.slice(0, -1));
-        if (targetParent) {
-          targetParent.parent.push(newSource.node);
+          // Update the file's folderId in our local state
+          source.node.folderId = target.node.id;
+
+          // Open the target folder
+          const targetFolder = target.node as FolderNode;
+          targetFolder.isOpen = true;
+
+          // Remove the source node from its current location
+          const sourceIndex = source.parent.findIndex(
+            (n) => n.id === source.node.id
+          );
+          if (sourceIndex === -1) return;
+          const [movedNode] = source.parent.splice(sourceIndex, 1);
+
+          // Add the node to the target folder's children
+          targetFolder.children.push(movedNode);
+        } else {
+          // Handle other move cases (folder to folder, etc.)
+          const sourceIndex = source.parent.findIndex(
+            (n) => n.id === source.node.id
+          );
+          if (sourceIndex === -1) return;
+          const [movedNode] = source.parent.splice(sourceIndex, 1);
+
+          if (target.node.type === "folder") {
+            const targetFolder = target.node as FolderNode;
+            targetFolder.children.push(movedNode);
+          } else {
+            const targetParent = findNode(
+              newStructure,
+              targetPath.slice(0, -1)
+            );
+            if (targetParent) {
+              targetParent.parent.push(movedNode);
+            }
+          }
         }
-      }
 
-      setStructure(newStructure);
-      onStructureChange?.(newStructure);
+        setStructure(newStructure);
+        onStructureChange?.(newStructure);
+        toast.success("File moved successfully");
+
+        // Refresh the structure to ensure we have the latest data
+        await onRefresh?.();
+      } catch (error) {
+        console.error("Error moving file:", error);
+        toast.error("Failed to move file");
+        // Refresh to ensure UI is in sync with backend
+        await onRefresh?.();
+      }
     },
-    [structure, onStructureChange]
+    [structure, onStructureChange, onRefresh]
   );
 
   const toggleFolder = (folder: FolderNode) => {
@@ -248,94 +366,146 @@ export function RagFolderStructure({
     }
   };
 
-  const renderNode = (
-    node: TreeNode,
-    depth: number = 0,
-    parentPath: string[] = []
-  ) => {
-    const isFolder = node.type === "folder";
-    const Icon = isFolder ? FolderIcon : FileIcon;
-    const Chevron =
-      isFolder && (node as FolderNode).isOpen
-        ? ChevronDownIcon
-        : ChevronRightIcon;
-    const currentPath = [...parentPath, node.name];
+  // Create a stable drag source hook
+  const [draggedItem, setDraggedItem] = useState<DraggableItem | null>(null);
 
-    return (
-      <div
-        key={node.name}
-        className={cn(
-          "flex flex-col",
-          isOver && "bg-accent/50",
-          isDragging && "opacity-50"
-        )}
-      >
-        <div
-          ref={(node) => {
-            drag(node);
-            drop(node);
-          }}
-          className={cn(
-            "flex items-center gap-2 px-2 py-1 hover:bg-accent/50 rounded-md cursor-pointer group",
-            "transition-colors duration-200"
-          )}
-          style={{ paddingLeft: `${depth * 16 + 8}px` }}
-          onClick={() => {
-            if (isFolder) {
-              toggleFolder(node as FolderNode);
-              onFolderSelect?.(node as FolderNode);
-            } else {
-              onFileSelect?.(node as FileNode);
+  const DraggableNode = useCallback(
+    ({
+      node,
+      depth,
+      parentPath,
+    }: {
+      node: TreeNode;
+      depth: number;
+      parentPath: string[];
+    }) => {
+      const isFolder = node.type === "folder";
+      const Icon = isFolder ? FolderIcon : FileIcon;
+      const Chevron =
+        isFolder && (node as FolderNode).isOpen
+          ? ChevronDownIcon
+          : ChevronRightIcon;
+      const currentPath = [...parentPath, node.name];
+
+      const [{ isDragging }, drag] = useDrag(
+        () => ({
+          type: "node",
+          item: { type: node.type, node, parentPath: currentPath },
+          collect: (monitor) => ({
+            isDragging: monitor.isDragging(),
+          }),
+        }),
+        [node, currentPath]
+      );
+
+      const [{ isOver }, drop] = useDrop(
+        () => ({
+          accept: "node",
+          drop: (item: DraggableItem) => {
+            if (item.parentPath.join("/") !== currentPath.join("/")) {
+              moveNode(item.parentPath, currentPath);
             }
-          }}
-          onDragStart={() => {
-            setDraggedNode({
-              type: node.type,
-              node,
-              parentPath: currentPath,
-            });
-          }}
+          },
+          collect: (monitor) => ({
+            isOver: monitor.isOver(),
+          }),
+        }),
+        [currentPath, moveNode]
+      );
+
+      const ref = (element: HTMLDivElement | null) => {
+        drag(element);
+        drop(element);
+      };
+
+      return (
+        <div
+          key={node.name}
+          className={cn(
+            "flex flex-col",
+            isOver && "bg-accent/50",
+            isDragging && "opacity-50"
+          )}
         >
-          {isFolder && <Chevron className="h-4 w-4 text-muted-foreground" />}
-          <Icon className="h-4 w-4 text-muted-foreground" />
-          <span className="text-sm flex-1">{node.name}</span>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <MoreVerticalIcon className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={(e) => e.stopPropagation()}>
-                Rename
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={(e) => {
-                  e.stopPropagation();
-                  deleteNode(node, currentPath);
-                }}
-                className="text-destructive"
-              >
-                Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-        {isFolder && (node as FolderNode).isOpen && (
-          <div className="flex flex-col">
-            {(node as FolderNode).children.map((child) =>
-              renderNode(child, depth + 1, currentPath)
+          <div
+            ref={ref}
+            className={cn(
+              "flex items-center gap-2 px-2 py-1 hover:bg-accent/50 rounded-md cursor-pointer group",
+              "transition-colors duration-200"
             )}
+            style={{ paddingLeft: `${depth * 16 + 8}px` }}
+            onClick={() => {
+              if (isFolder) {
+                toggleFolder(node as FolderNode);
+                onFolderSelect?.(node as FolderNode);
+              } else {
+                onFileSelect?.(node as FileNode);
+              }
+            }}
+          >
+            <GripVerticalIcon
+              className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 cursor-grab active:cursor-grabbing"
+              onMouseDown={(e) => e.stopPropagation()} // Prevent click event when dragging
+            />
+            {isFolder && <Chevron className="h-4 w-4 text-muted-foreground" />}
+            <Icon className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm flex-1">{node.name}</span>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <MoreVerticalIcon className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={(e) => e.stopPropagation()}>
+                  Rename
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    deleteNode(node, currentPath);
+                  }}
+                  className="text-destructive"
+                >
+                  Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
-        )}
-      </div>
-    );
-  };
+          {isFolder && (node as FolderNode).isOpen && (
+            <div className="flex flex-col">
+              {(node as FolderNode).children.map((child) => (
+                <DraggableNode
+                  key={child.name}
+                  node={child}
+                  depth={depth + 1}
+                  parentPath={currentPath}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      );
+    },
+    [moveNode, onFileSelect, onFolderSelect, toggleFolder, deleteNode]
+  );
+
+  const renderNode = useCallback(
+    (node: TreeNode, depth: number = 0, parentPath: string[] = []) => (
+      <DraggableNode
+        key={node.name}
+        node={node}
+        depth={depth}
+        parentPath={parentPath}
+      />
+    ),
+    []
+  );
 
   return (
     <div className="flex flex-col gap-1">
