@@ -20,6 +20,7 @@ interface RagFileManagerProps {
   onStructureChange: (newStructure: TreeNode[]) => void;
   onFileSelect?: (file: FileNode) => void;
   onFolderSelect?: (folder: FolderNode) => void;
+  onRefresh?: () => Promise<void>;
 }
 
 export function RagFileManager({
@@ -27,6 +28,7 @@ export function RagFileManager({
   onStructureChange,
   onFileSelect,
   onFolderSelect,
+  onRefresh,
 }: RagFileManagerProps) {
   const [showNewFolderDialog, setShowNewFolderDialog] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
@@ -62,6 +64,7 @@ export function RagFileManager({
 
             return {
               type: "file" as const,
+              id: data.id,
               name: file.name,
               path: data.path || `/uploads/${file.name}`,
             };
@@ -70,6 +73,10 @@ export function RagFileManager({
 
         // Add files to the root of the structure
         onStructureChange([...structure, ...newFiles]);
+
+        // Refresh the structure after successful upload
+        await onRefresh?.();
+
         toast.success(`Added ${acceptedFiles.length} file(s)`);
       } catch (error) {
         console.error("Error uploading files:", error);
@@ -78,7 +85,7 @@ export function RagFileManager({
         setIsUploading(false);
       }
     },
-    [structure, onStructureChange]
+    [structure, onStructureChange, onRefresh]
   );
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -121,12 +128,17 @@ export function RagFileManager({
       // Create folder node with the data from the server
       const newFolder: FolderNode = {
         type: "folder",
+        id: folderData.id,
         name: folderData.name,
         children: [],
         isOpen: true,
       };
 
       onStructureChange([...structure, newFolder]);
+
+      // Refresh the structure after successful folder creation
+      await onRefresh?.();
+
       setShowNewFolderDialog(false);
       setNewFolderName("");
       toast.success("Folder created successfully");

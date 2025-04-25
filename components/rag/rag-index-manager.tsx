@@ -21,7 +21,11 @@ interface IndexedDocument {
   chunkCount: number;
 }
 
-export function RagIndexManager() {
+interface RagIndexManagerProps {
+  onRefresh?: () => Promise<void>;
+}
+
+export function RagIndexManager({ onRefresh }: RagIndexManagerProps) {
   const [documents, setDocuments] = useState<IndexedDocument[]>([]);
   const [selectedDocuments, setSelectedDocuments] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -78,6 +82,10 @@ export function RagIndexManager() {
 
       toast.success("Documents deleted successfully");
       setSelectedDocuments([]);
+
+      // Refresh the structure after successful deletion
+      await onRefresh?.();
+
       fetchDocuments();
     } catch (error) {
       console.error("Error deleting documents:", error);

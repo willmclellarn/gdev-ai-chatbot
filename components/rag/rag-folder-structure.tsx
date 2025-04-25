@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import {
   FolderIcon,
   FileIcon,
@@ -22,10 +22,12 @@ import {
   DragSourceMonitor,
   DropTargetMonitor,
 } from "react-dnd";
+import { toast } from "sonner";
 
 // Define types for our folder structure
 export interface FileNode {
   type: "file";
+  id: string;
   name: string;
   path: string;
   size?: number;
@@ -33,6 +35,7 @@ export interface FileNode {
 
 export interface FolderNode {
   type: "folder";
+  id: string;
   name: string;
   children: (FileNode | FolderNode)[];
   isOpen?: boolean;
@@ -45,6 +48,7 @@ interface RagFolderStructureProps {
   onFolderSelect?: (folder: FolderNode) => void;
   initialStructure?: TreeNode[];
   onStructureChange?: (newStructure: TreeNode[]) => void;
+  onRefresh?: () => Promise<void>;
 }
 
 interface DraggableItem {
@@ -58,11 +62,15 @@ export function RagFolderStructure({
   onFolderSelect,
   initialStructure = [],
   onStructureChange,
+  onRefresh,
 }: RagFolderStructureProps) {
   const [structure, setStructure] = useState<TreeNode[]>(initialStructure);
-  const dropRef = useRef<HTMLDivElement>(null);
-  const dragRef = useRef<HTMLDivElement>(null);
   const [draggedNode, setDraggedNode] = useState<DraggableItem | null>(null);
+
+  // Sync structure with initialStructure when it changes
+  useEffect(() => {
+    setStructure(initialStructure);
+  }, [initialStructure]);
 
   const [{ isDragging }, drag] = useDrag(() => ({
     type: "node",
@@ -75,7 +83,9 @@ export function RagFolderStructure({
   const [{ isOver }, drop] = useDrop(() => ({
     accept: "node",
     drop: (item: DraggableItem) => {
-      moveNode(item.parentPath, draggedNode?.parentPath || []);
+      if (draggedNode) {
+        moveNode(item.parentPath, draggedNode.parentPath);
+      }
     },
     collect: (monitor: DropTargetMonitor) => ({
       isOver: monitor.isOver(),
@@ -110,24 +120,35 @@ export function RagFolderStructure({
 
       if (!source || !target) return;
 
+      // Create a deep copy of the structure to avoid mutating the original
+      const newStructure = JSON.parse(JSON.stringify(structure));
+
+      // Find the nodes in the new structure
+      const newSource = findNode(newStructure, dragPath);
+      const newTarget = findNode(newStructure, dropPath);
+
+      if (!newSource || !newTarget) return;
+
       // Remove from source
-      const sourceIndex = source.parent.findIndex((n) => n === source.node);
-      source.parent.splice(sourceIndex, 1);
+      const sourceIndex = newSource.parent.findIndex(
+        (n) => n === newSource.node
+      );
+      newSource.parent.splice(sourceIndex, 1);
 
       // Add to target
-      if (target.node.type === "folder") {
-        const targetFolder = target.node as FolderNode;
-        targetFolder.children.push(source.node);
+      if (newTarget.node.type === "folder") {
+        const targetFolder = newTarget.node as FolderNode;
+        targetFolder.children.push(newSource.node);
       } else {
         // If target is a file, add to its parent
-        const targetParent = findNode(structure, dropPath.slice(0, -1));
+        const targetParent = findNode(newStructure, dropPath.slice(0, -1));
         if (targetParent) {
-          targetParent.parent.push(source.node);
+          targetParent.parent.push(newSource.node);
         }
       }
 
-      setStructure([...structure]);
-      onStructureChange?.(structure);
+      setStructure(newStructure);
+      onStructureChange?.(newStructure);
     },
     [structure, onStructureChange]
   );
@@ -150,6 +171,83 @@ export function RagFolderStructure({
     });
   };
 
+  const deleteNode = async (node: TreeNode, parentPath: string[]) => {
+    try {
+      // Check if node has an ID first
+      if (!node.id) {
+        throw new Error(`${node.type} ID is missing`);
+      }
+
+      if (node.type === "file") {
+        console.log("🔵 Deleting file:", node.id);
+
+        // Delete file from database
+        const response = await fetch("/api/rag/files", {
+          method: "DELETE",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ fileId: node.id }),
+        });
+
+        console.log("🔵 File deleted:", response);
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || "Failed to delete file");
+        }
+      } else {
+        // Delete folder from database
+        const response = await fetch("/api/rag/folders", {
+          method: "DELETE",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ folderId: node.id }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || "Failed to delete folder");
+        }
+      }
+
+      // Update local structure
+      const updateStructure = (
+        nodes: TreeNode[],
+        path: string[]
+      ): TreeNode[] => {
+        if (path.length === 0) {
+          return nodes.filter((n) => n !== node);
+        }
+
+        return nodes.map((n) => {
+          if (n.type === "folder") {
+            return {
+              ...n,
+              children: updateStructure(n.children, path.slice(1)),
+            };
+          }
+          return n;
+        });
+      };
+
+      const newStructure = updateStructure(structure, parentPath);
+      setStructure(newStructure);
+      onStructureChange?.(newStructure);
+
+      // Refresh the structure after successful deletion
+      await onRefresh?.();
+
+      toast.success(
+        `${node.type === "file" ? "File" : "Folder"} deleted successfully`
+      );
+    } catch (error) {
+      console.error(`Error deleting ${node.type}:`, error);
+      toast.error(`Failed to delete ${node.type}`);
+    }
+  };
+
   const renderNode = (
     node: TreeNode,
     depth: number = 0,
@@ -165,7 +263,6 @@ export function RagFolderStructure({
 
     return (
       <div
-        ref={dropRef}
         key={node.name}
         className={cn(
           "flex flex-col",
@@ -174,7 +271,10 @@ export function RagFolderStructure({
         )}
       >
         <div
-          ref={dragRef}
+          ref={(node) => {
+            drag(node);
+            drop(node);
+          }}
           className={cn(
             "flex items-center gap-2 px-2 py-1 hover:bg-accent/50 rounded-md cursor-pointer group",
             "transition-colors duration-200"
@@ -214,7 +314,13 @@ export function RagFolderStructure({
               <DropdownMenuItem onClick={(e) => e.stopPropagation()}>
                 Rename
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={(e) => e.stopPropagation()}>
+              <DropdownMenuItem
+                onClick={(e) => {
+                  e.stopPropagation();
+                  deleteNode(node, currentPath);
+                }}
+                className="text-destructive"
+              >
                 Delete
               </DropdownMenuItem>
             </DropdownMenuContent>

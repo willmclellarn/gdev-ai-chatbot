@@ -4,6 +4,9 @@ import { db } from "@/lib/db";
 import { ragFile, ragFolder } from "@/lib/db/schema";
 import { eq, inArray, and, isNull } from "drizzle-orm";
 
+// TODO: de dupe filenames
+// TODO: show filetype extensions
+
 // GET /api/rag/files - Get all files for the current user and their organizations
 export async function GET() {
   try {

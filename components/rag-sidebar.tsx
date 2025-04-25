@@ -23,7 +23,7 @@ import {
 } from "./rag/rag-folder-structure";
 import { RagIndexManager } from "./rag/rag-index-manager";
 import { RagFileManager } from "./rag/rag-file-manager";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { DndProvider } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 import { toast } from "sonner";
@@ -32,6 +32,13 @@ interface RagSidebarProps {
   children?: React.ReactNode;
 }
 
+// TODO: add draggable files and folders
+// TODO: add file preview
+// TODO: add folder preview
+// TODO: add file search
+// TODO: add file filter
+// TODO: add file sort
+
 export function RagSidebar({ children }: RagSidebarProps) {
   const router = useRouter();
   const { setOpenMobile } = useSidebar();
@@ -39,89 +46,100 @@ export function RagSidebar({ children }: RagSidebarProps) {
   const [structure, setStructure] = useState<TreeNode[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Function to fetch and transform data
+  const fetchAndTransformData = async () => {
+    try {
+      // Fetch folders
+      const foldersResponse = await fetch("/api/rag/folders");
+      if (!foldersResponse.ok) {
+        throw new Error("Failed to fetch folders");
+      }
+      const foldersData = await foldersResponse.json();
+
+      // Fetch files
+      const filesResponse = await fetch("/api/rag/files");
+      if (!filesResponse.ok) {
+        throw new Error("Failed to fetch files");
+      }
+      const filesData = await filesResponse.json();
+
+      // Transform folders and files into TreeNode structure
+      const transformedStructure: TreeNode[] = [];
+
+      // Add personal folders
+      if (foldersData.personalFolders) {
+        foldersData.personalFolders.forEach((folder: any) => {
+          const folderNode: FolderNode = {
+            type: "folder",
+            id: folder.id,
+            name: folder.name,
+            children: [],
+            isOpen: false,
+          };
+          transformedStructure.push(folderNode);
+        });
+      }
+
+      // Add organization folders
+      if (foldersData.organizationFolders) {
+        foldersData.organizationFolders.forEach((folder: any) => {
+          const folderNode: FolderNode = {
+            type: "folder",
+            id: folder.id,
+            name: folder.name,
+            children: [],
+            isOpen: false,
+          };
+          transformedStructure.push(folderNode);
+        });
+      }
+
+      // Add personal files
+      if (filesData.personalFiles) {
+        filesData.personalFiles.forEach((file: any) => {
+          const fileNode: FileNode = {
+            type: "file",
+            id: file.id,
+            name: file.name,
+            path: file.path,
+            size: file.size,
+          };
+          transformedStructure.push(fileNode);
+        });
+      }
+
+      // Add organization files
+      if (filesData.organizationFiles) {
+        filesData.organizationFiles.forEach((file: any) => {
+          const fileNode: FileNode = {
+            type: "file",
+            id: file.id,
+            name: file.name,
+            path: file.path,
+            size: file.size,
+          };
+          transformedStructure.push(fileNode);
+        });
+      }
+
+      setStructure(transformedStructure);
+    } catch (error) {
+      console.error("Error fetching data:", error);
+      toast.error("Failed to load data");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Function to refresh the structure data
+  const refreshStructure = useCallback(async () => {
+    setIsLoading(true);
+    await fetchAndTransformData();
+  }, []);
+
   // Fetch folders and files when component mounts
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        // Fetch folders
-        const foldersResponse = await fetch("/api/rag/folders");
-        if (!foldersResponse.ok) {
-          throw new Error("Failed to fetch folders");
-        }
-        const foldersData = await foldersResponse.json();
-
-        // Fetch files
-        const filesResponse = await fetch("/api/rag/files");
-        if (!filesResponse.ok) {
-          throw new Error("Failed to fetch files");
-        }
-        const filesData = await filesResponse.json();
-
-        // Transform folders and files into TreeNode structure
-        const transformedStructure: TreeNode[] = [];
-
-        // Add personal folders
-        if (foldersData.personalFolders) {
-          foldersData.personalFolders.forEach((folder: any) => {
-            const folderNode: FolderNode = {
-              type: "folder",
-              name: folder.name,
-              children: [],
-              isOpen: false,
-            };
-            transformedStructure.push(folderNode);
-          });
-        }
-
-        // Add organization folders
-        if (foldersData.organizationFolders) {
-          foldersData.organizationFolders.forEach((folder: any) => {
-            const folderNode: FolderNode = {
-              type: "folder",
-              name: folder.name,
-              children: [],
-              isOpen: false,
-            };
-            transformedStructure.push(folderNode);
-          });
-        }
-
-        // Add personal files
-        if (filesData.personalFiles) {
-          filesData.personalFiles.forEach((file: any) => {
-            const fileNode: FileNode = {
-              type: "file",
-              name: file.name,
-              path: file.path,
-              size: file.size,
-            };
-            transformedStructure.push(fileNode);
-          });
-        }
-
-        // Add organization files
-        if (filesData.organizationFiles) {
-          filesData.organizationFiles.forEach((file: any) => {
-            const fileNode: FileNode = {
-              type: "file",
-              name: file.name,
-              path: file.path,
-              size: file.size,
-            };
-            transformedStructure.push(fileNode);
-          });
-        }
-
-        setStructure(transformedStructure);
-      } catch (error) {
-        console.error("Error fetching data:", error);
-        toast.error("Failed to load data");
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchData();
+    fetchAndTransformData();
   }, []);
 
   const handleFileSelect = (file: FileNode) => {
@@ -131,7 +149,10 @@ export function RagSidebar({ children }: RagSidebarProps) {
 
   const handleFolderSelect = (folder: FolderNode) => {
     console.log("Selected folder:", folder);
-    // TODO: Implement folder selection logic
+  };
+
+  const handleStructureChange = (newStructure: TreeNode[]) => {
+    setStructure(newStructure);
   };
 
   return (
@@ -188,17 +209,21 @@ export function RagSidebar({ children }: RagSidebarProps) {
                       onStructureChange={setStructure}
                       onFileSelect={handleFileSelect}
                       onFolderSelect={handleFolderSelect}
+                      onRefresh={refreshStructure}
                     />
-                    <RagFolderStructure
-                      initialStructure={structure}
-                      onFileSelect={handleFileSelect}
-                      onFolderSelect={handleFolderSelect}
-                      onStructureChange={setStructure}
-                    />
+                    <div className="flex-1 overflow-auto">
+                      <RagFolderStructure
+                        initialStructure={structure}
+                        onFileSelect={handleFileSelect}
+                        onFolderSelect={handleFolderSelect}
+                        onStructureChange={handleStructureChange}
+                        onRefresh={refreshStructure}
+                      />
+                    </div>
                   </div>
                 </DndProvider>
               ) : (
-                <RagIndexManager />
+                <RagIndexManager onRefresh={refreshStructure} />
               )}
             </div>
           </div>

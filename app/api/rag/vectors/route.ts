@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { pinecone } from "@/lib/pinecone/pinecone";
 import { db } from "@/lib/db";
 import { ragFile } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 
 export async function GET() {
   try {
@@ -40,49 +40,97 @@ export async function GET() {
 
 export async function DELETE(request: Request) {
   try {
-    const { documentIds } = await request.json();
+    const { documentIds, documentTitle } = await request.json();
 
-    if (!Array.isArray(documentIds) || documentIds.length === 0) {
+    // Validate input - must have either documentIds or documentTitle
+    if ((!documentIds || !Array.isArray(documentIds)) && !documentTitle) {
       return NextResponse.json(
-        { error: "No document IDs provided" },
+        { error: "Must provide either documentIds array or documentTitle" },
         { status: 400 }
       );
     }
 
     const courseMaterialNamespace = pinecone.namespace("course-material");
 
-    // Get the document details to construct proper vector IDs
-    const documentDetails = await db
-      .select({
-        name: ragFile.name,
-        chunkCount: ragFile.chunkCount,
-      })
-      .from(ragFile)
-      .where(eq(ragFile.vectorId, documentIds[0]));
+    // If documentTitle is provided, find the corresponding document
+    if (documentTitle) {
+      const documentDetails = await db
+        .select({
+          vectorId: ragFile.vectorId,
+          chunkCount: ragFile.chunkCount,
+        })
+        .from(ragFile)
+        .where(eq(ragFile.name, documentTitle));
 
-    if (documentDetails.length === 0) {
-      return NextResponse.json(
-        { error: "Document not found" },
-        { status: 404 }
+      if (documentDetails.length === 0) {
+        return NextResponse.json(
+          { error: "Document not found" },
+          { status: 404 }
+        );
+      }
+
+      const { vectorId, chunkCount } = documentDetails[0];
+
+      // Ensure vectorId is a string
+      if (!vectorId) {
+        return NextResponse.json(
+          { error: "Invalid document data" },
+          { status: 400 }
+        );
+      }
+
+      // Construct vector IDs for all chunks of this document
+      const vectorIds = Array.from(
+        { length: chunkCount },
+        (_, i) => `${documentTitle}-chunk-${i}`
       );
+
+      // Delete vectors from Pinecone
+      await courseMaterialNamespace.deleteMany(vectorIds);
+
+      // Delete the file record from the database
+      await db.delete(ragFile).where(eq(ragFile.vectorId, vectorId));
+
+      return NextResponse.json({
+        success: true,
+        message: `Deleted document "${documentTitle}" and all associated vectors`,
+      });
     }
 
-    const documentTitle = documentDetails[0].name;
-    const chunkCount = documentDetails[0].chunkCount;
+    // If documentIds are provided, handle vector deletion
+    if (documentIds && documentIds.length > 0) {
+      // Get document details for the first ID to verify it exists
+      const documentDetails = await db
+        .select({
+          name: ragFile.name,
+          chunkCount: ragFile.chunkCount,
+        })
+        .from(ragFile)
+        .where(inArray(ragFile.vectorId, documentIds));
 
-    // Construct vector IDs in the format used during upload
-    const vectorIds = Array.from(
-      { length: chunkCount },
-      (_, i) => `${documentTitle}-chunk-${i}`
+      if (documentDetails.length === 0) {
+        return NextResponse.json(
+          { error: "No matching documents found" },
+          { status: 404 }
+        );
+      }
+
+      // Delete vectors from Pinecone
+      await courseMaterialNamespace.deleteMany(documentIds);
+
+      // Delete the file records from the database
+      await db.delete(ragFile).where(inArray(ragFile.vectorId, documentIds));
+
+      return NextResponse.json({
+        success: true,
+        message: `Deleted ${documentIds.length} vectors and associated documents`,
+      });
+    }
+
+    return NextResponse.json(
+      { error: "Invalid request parameters" },
+      { status: 400 }
     );
-
-    // Delete vectors from Pinecone
-    await courseMaterialNamespace.deleteMany(vectorIds);
-
-    // Delete the file record from the database
-    await db.delete(ragFile).where(eq(ragFile.vectorId, documentIds[0]));
-
-    return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Error deleting vectors:", error);
     return NextResponse.json(
