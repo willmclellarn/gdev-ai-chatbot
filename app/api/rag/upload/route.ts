@@ -1,61 +1,65 @@
-import { NextResponse } from 'next/server';
-import { pinecone } from '@/lib/pinecone/pinecone';
-import { embedChunks } from '@/lib/utils/embedding';
-import { EmbeddingModel } from '@/lib/ai/models';
-import { embeddingModels } from '@/lib/ai/models';
+import { NextResponse } from "next/server";
+import { pinecone } from "@/lib/pinecone/pinecone";
+import { embedChunks } from "@/lib/utils/embedding";
+import { EmbeddingModel } from "@/lib/ai/models";
+import { embeddingModels } from "@/lib/ai/models";
+import { auth } from "@/app/(auth)/auth";
+import { put } from "@vercel/blob";
 
 export async function POST(request: Request) {
-  console.log('Starting RAG upload process...');
-
   try {
-    console.log('Parsing form data...');
+    const session = await auth();
+
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const formData = await request.formData();
-    const chunks = JSON.parse(formData.get('chunks') as string) as string[];
-    const embeddingModelId = formData.get('embeddingModel') as string;
-    const embeddingModel = embeddingModels.find(m => m.id === embeddingModelId);
+    const file = formData.get("file") as File;
 
-    console.log(`Received ${chunks?.length || 0} chunks for processing`);
-    console.log(`Selected embedding model: ${embeddingModelId}`);
+    if (!file) {
+      return NextResponse.json({ error: "No file provided" }, { status: 400 });
+    }
 
-    if (!chunks || !embeddingModel) {
-      console.error('Validation failed:', {
-        hasChunks: !!chunks,
-        hasValidModel: !!embeddingModel
-      });
+    // Validate file type
+    const allowedTypes = [
+      "application/pdf",
+      "application/msword",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "text/plain",
+      "text/markdown",
+    ];
+
+    if (!allowedTypes.includes(file.type)) {
       return NextResponse.json(
-        { error: 'No chunks or invalid embedding model provided' },
+        { error: "File type not supported" },
         { status: 400 }
       );
     }
 
-    console.log('Generating embeddings...');
-    const embeddings = await embedChunks(chunks, embeddingModel);
-    console.log(`Successfully generated ${embeddings.embeddings.length} embeddings`);
+    // Validate file size (10MB limit)
+    if (file.size > 10 * 1024 * 1024) {
+      return NextResponse.json(
+        { error: "File size exceeds 10MB limit" },
+        { status: 400 }
+      );
+    }
 
-    console.log('Preparing Pinecone records...');
-    const pineconeRecords = chunks.map((chunk, i) => ({
-      id: `chunk_${i}`,
-      values: embeddings.embeddings[i],
-      metadata: { text: chunk }
-    }));
-    console.log(`Prepared ${pineconeRecords.length} records for upsert`);
-
-    console.log('Upserting records to Pinecone...');
-    await pinecone.namespace('course-material').upsert(pineconeRecords);
-    console.log('Successfully upserted records to Pinecone');
+    // Upload file to blob storage
+    const blob = await put(`rag/${file.name}`, file, {
+      access: "public",
+    });
 
     return NextResponse.json({
-      success: true,
-      message: 'Chunks processed successfully',
-      chunkCount: chunks.length,
+      path: blob.url,
+      name: file.name,
+      size: file.size,
+      type: file.type,
     });
   } catch (error) {
-    console.error('Error processing chunks:', {
-      error: error instanceof Error ? error.message : 'Unknown error',
-      stack: error instanceof Error ? error.stack : undefined
-    });
+    console.error("Error uploading file:", error);
     return NextResponse.json(
-      { error: 'Failed to process chunks' },
+      { error: "Failed to upload file" },
       { status: 500 }
     );
   }

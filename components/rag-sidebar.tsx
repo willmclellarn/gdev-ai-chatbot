@@ -22,7 +22,10 @@ import {
   type FolderNode,
 } from "./rag/rag-folder-structure";
 import { RagIndexManager } from "./rag/rag-index-manager";
+import { RagFileManager } from "./rag/rag-file-manager";
 import { useState } from "react";
+import { DndProvider } from "react-dnd";
+import { HTML5Backend } from "react-dnd-html5-backend";
 
 // Example folder structure data
 const exampleStructure: TreeNode[] = [
@@ -60,6 +63,7 @@ export function RagSidebar({ children }: RagSidebarProps) {
   const router = useRouter();
   const { setOpenMobile } = useSidebar();
   const [activeTab, setActiveTab] = useState<"files" | "index">("files");
+  const [structure, setStructure] = useState<TreeNode[]>(exampleStructure);
 
   const handleFileSelect = (file: FileNode) => {
     console.log("Selected file:", file);
@@ -72,8 +76,8 @@ export function RagSidebar({ children }: RagSidebarProps) {
   };
 
   return (
-    <div className="flex h-screen overflow-hidden">
-      <Sidebar className="h-full border-r w-[280px] shrink-0">
+    <div className="flex h-screen">
+      <Sidebar className="h-full border-r w-[24rem] shrink-0">
         <SidebarHeader className="border-b">
           <SidebarMenu>
             <div className="flex flex-row justify-between items-center px-4 py-2">
@@ -114,11 +118,22 @@ export function RagSidebar({ children }: RagSidebarProps) {
             </div>
             <div className="flex-1 overflow-auto p-4">
               {activeTab === "files" ? (
-                <RagFolderStructure
-                  initialStructure={exampleStructure}
-                  onFileSelect={handleFileSelect}
-                  onFolderSelect={handleFolderSelect}
-                />
+                <DndProvider backend={HTML5Backend}>
+                  <div className="flex flex-col gap-4">
+                    <RagFileManager
+                      structure={structure}
+                      onStructureChange={setStructure}
+                      onFileSelect={handleFileSelect}
+                      onFolderSelect={handleFolderSelect}
+                    />
+                    <RagFolderStructure
+                      initialStructure={structure}
+                      onFileSelect={handleFileSelect}
+                      onFolderSelect={handleFolderSelect}
+                      onStructureChange={setStructure}
+                    />
+                  </div>
+                </DndProvider>
               ) : (
                 <RagIndexManager />
               )}
